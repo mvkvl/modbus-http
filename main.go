@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"github.com/gorilla/mux"
 	"github.com/mvkvl/modbus"
+	"github.com/mvkvl/modbus-http/device"
 	"github.com/mvkvl/modbus-http/model"
 	"log"
 	"net/http"
@@ -12,7 +13,7 @@ import (
 )
 
 const (
-	gateway = "localhost:20108"
+	gateway = "mge:20108"
 )
 
 func main() {
@@ -22,6 +23,24 @@ func main() {
 		return
 	}
 	printConfig(config)
+	modbusClient := createModbusClient()
+	readRegister(&modbusClient, config, "wb-mge-01:msw-k:temperature")
+	readRegister(&modbusClient, config, "wb-mge-01:msw-k:Temperature")
+	//v, err := device.ReadFloatRegister(&modbusClient, &config.Channels[0].Devices[2].Registers[0])
+	//res, _ := modbusClient.ReadHoldingRegisters(12, 0, 1)
+	//val := binary.BigEndian.Uint16(res)
+	//fmt.Printf("% x => %d\n", res, val)
+	//startServer(&modbusClient)
+	//eval := goval.NewEvaluator()
+}
+
+func readRegister(client *modbus.Client, config *model.Config, reference string) {
+	v, err := device.ReadFloat(client, config, reference)
+	if nil != err {
+		log.Fatalf("%s\n", err)
+	} else {
+		log.Printf("value: %.2f", v)
+	}
 }
 
 func readConfig(path string) (*model.Config, error) {
@@ -33,6 +52,16 @@ func readConfig(path string) (*model.Config, error) {
 	if err := json.Unmarshal(content, &config); err != nil {
 		return nil, err
 	}
+	// add back-reference from register to device
+	for i := 0; i < len(config.Channels); i++ {
+		c := config.Channels[i]
+		for j := 0; j < len(c.Devices); j++ {
+			d := c.Devices[j]
+			for k := 0; k < len(d.Registers); k++ {
+				d.Registers[k].Device = &d
+			}
+		}
+	}
 	return &config, nil
 }
 func printConfig(config *model.Config) {
@@ -41,21 +70,26 @@ func printConfig(config *model.Config) {
 		for _, d := range c.Devices {
 			log.Printf("\t%s:%d\n", d.Title, d.SlaveId)
 			for _, r := range d.Registers {
-				log.Printf("\t\taddr: %4d, size: %2d, type: %7s, mode: %s\n", r.Address, r.Size, r.Type, r.Mode)
+				log.Printf(
+					"\t\taddr: %4d, size: %2d, type: %7s, mode: %s, factor: %f, dev: %s\n",
+					r.Address, r.Size, r.Type, r.Mode, r.Factor, r.Device.Title)
 			}
 		}
 	}
 }
-
-func startServer() {
+func createModbusClient() modbus.Client {
 	handler := modbus.NewEncClientHandler(gateway)
 	handler.IdleTimeout = 2 * time.Second
 	handler.Timeout = 1 * time.Second
 	handler.Logger = log.New(os.Stdout, "tcp: ", log.LstdFlags|log.Lmicroseconds)
 	defer handler.Close()
+	client := modbus.NewClient(handler)
+	return client
+}
+func startServer(client *modbus.Client) {
 
 	server := &Server{
-		client: modbus.NewClient(handler),
+		client: *client,
 	}
 
 	r := mux.NewRouter()
