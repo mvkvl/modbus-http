@@ -1,8 +1,10 @@
 package main
 
 import (
+	"encoding/json"
 	"github.com/gorilla/mux"
 	"github.com/mvkvl/modbus"
+	"github.com/mvkvl/modbus-http/model"
 	"log"
 	"net/http"
 	"os"
@@ -14,7 +16,38 @@ const (
 )
 
 func main() {
+	config, err := readConfig("./conf/channels.json")
+	if nil != err {
+		log.Fatalf("error reading config: %s", err)
+		return
+	}
+	printConfig(config)
+}
 
+func readConfig(path string) (*model.Config, error) {
+	content, err := os.ReadFile(path)
+	if err != nil {
+		return nil, err
+	}
+	var config model.Config
+	if err := json.Unmarshal(content, &config); err != nil {
+		return nil, err
+	}
+	return &config, nil
+}
+func printConfig(config *model.Config) {
+	for _, c := range config.Channels {
+		log.Printf("title: %s, conn: %s, mode: %s\n", c.Title, c.Connection, c.Mode)
+		for _, d := range c.Devices {
+			log.Printf("\t%s:%d\n", d.Title, d.SlaveId)
+			for _, r := range d.Registers {
+				log.Printf("\t\taddr: %4d, size: %2d, type: %7s, mode: %s\n", r.Address, r.Size, r.Type, r.Mode)
+			}
+		}
+	}
+}
+
+func startServer() {
 	handler := modbus.NewEncClientHandler(gateway)
 	handler.IdleTimeout = 2 * time.Second
 	handler.Timeout = 1 * time.Second
