@@ -22,24 +22,31 @@ func main() {
 		log.Fatalf("error reading config: %s", err)
 		return
 	}
-	printConfig(config)
+	//printConfig(config)
 	modbusClient := createModbusClient()
 	readRegister(&modbusClient, config, "wb-mge-01:msw-k:temperature")
 	readRegister(&modbusClient, config, "wb-mge-01:msw-k:Temperature")
-	//v, err := device.ReadFloatRegister(&modbusClient, &config.Channels[0].Devices[2].Registers[0])
-	//res, _ := modbusClient.ReadHoldingRegisters(12, 0, 1)
-	//val := binary.BigEndian.Uint16(res)
-	//fmt.Printf("% x => %d\n", res, val)
-	//startServer(&modbusClient)
-	//eval := goval.NewEvaluator()
+	readRegister(&modbusClient, config, "wb-mge-01:msw-k:humidity")
+	readRegister(&modbusClient, config, "wb-mge-01:msw-k:Humidity")
+	readRegister(&modbusClient, config, "wb-mge-01:msw-k:noise")
+	readRegister(&modbusClient, config, "wb-mge-01:msw-k:CO2")
+	readRegister(&modbusClient, config, "wb-mge-01:msw-k:air_quality")
+	log.Println("-----------------------------------------------")
+	readRegister(&modbusClient, config, "wb-mge-01:msw-b:temperature")
+	readRegister(&modbusClient, config, "wb-mge-01:msw-b:Temperature")
+	readRegister(&modbusClient, config, "wb-mge-01:msw-b:humidity")
+	readRegister(&modbusClient, config, "wb-mge-01:msw-b:Humidity")
+	readRegister(&modbusClient, config, "wb-mge-01:msw-b:noise")
+	readRegister(&modbusClient, config, "wb-mge-01:msw-b:CO2")
+	readRegister(&modbusClient, config, "wb-mge-01:msw-b:air_quality")
 }
 
 func readRegister(client *modbus.Client, config *model.Config, reference string) {
-	v, err := device.ReadFloat(client, config, reference)
+	v, t, err := device.ReadFloat(client, config, reference)
 	if nil != err {
 		log.Fatalf("%s\n", err)
 	} else {
-		log.Printf("value: %.2f", v)
+		log.Printf("%-11s: %.2f", t, v)
 	}
 }
 
@@ -81,7 +88,7 @@ func createModbusClient() modbus.Client {
 	handler := modbus.NewEncClientHandler(gateway)
 	handler.IdleTimeout = 2 * time.Second
 	handler.Timeout = 1 * time.Second
-	handler.Logger = log.New(os.Stdout, "tcp: ", log.LstdFlags|log.Lmicroseconds)
+	//handler.Logger = log.New(os.Stdout, "tcp: ", log.LstdFlags|log.Lmicroseconds)
 	defer handler.Close()
 	client := modbus.NewClient(handler)
 	return client
@@ -104,3 +111,10 @@ func startServer(client *modbus.Client) {
 	// Bind to a port and pass our router in
 	log.Fatal(http.ListenAndServe(":80", r))
 }
+
+//v, err := device.ReadFloatRegister(&modbusClient, &config.Channels[0].Devices[2].Registers[0])
+//res, _ := modbusClient.ReadHoldingRegisters(12, 0, 1)
+//val := binary.BigEndian.Uint16(res)
+//fmt.Printf("% x => %d\n", res, val)
+//startServer(&modbusClient)
+//eval := goval.NewEvaluator()

@@ -100,12 +100,13 @@ func ReadFloatRegister(client *modbus.Client, register *model.Register) (result 
 	}
 
 }
-func ReadFloat(client *modbus.Client, config *model.Config, reference string) (result float64, err error) {
+func ReadFloat(client *modbus.Client, config *model.Config, reference string) (result float64, title string, err error) {
 	reg, err := findRegister(config, reference)
 	if nil != err {
-		return 0, err
+		return 0, "", err
 	}
-	return ReadFloatRegister(client, reg)
+	v, e := ReadFloatRegister(client, reg)
+	return v, reg.Title, e
 }
 
 // endregion
