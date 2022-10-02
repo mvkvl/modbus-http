@@ -72,15 +72,14 @@ func startServer(config *model.Config) {
 
 	poller := service.CreateModbusPoller(modbusHandlerFactory, config)
 	poller.Start()
-	defer service.DestroyModbusPoller(&poller)
 
-	//directModbusService := controller.NewDirectModbusClient(modbus.NewClient(modbusHandlerFactory(gateway, model.ENC)))
 	cachedModbusService := controller.NewCachedModbusClient(poller)
 
 	r := mux.NewRouter()
 	r.HandleFunc("/start", cachedModbusService.Start).Methods("POST")
 	r.HandleFunc("/stop", cachedModbusService.Stop).Methods("POST")
 	r.HandleFunc("/cycle", cachedModbusService.Cycle).Methods("POST")
+	r.HandleFunc("/metrics", cachedModbusService.Metrics).Methods("GET")
 	r.HandleFunc("/metric/{metric}", cachedModbusService.Get).Methods("GET")
 
 	// Bind to a port and pass our router in

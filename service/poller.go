@@ -41,6 +41,7 @@ type Poller interface {
 	WriteByte(key string, value uint8, callback func()) error
 	WriteWord(key string, value uint16, callback func()) error
 	WriteValue(key string, value float32, callback func()) error
+	Metrics() []string
 }
 
 func CreateModbusPoller(handlerFactory func(connection string, mode model.Mode) modbus.ClientHandler, config *model.Config) Poller {
@@ -61,6 +62,32 @@ func CreateModbusPoller(handlerFactory func(connection string, mode model.Mode) 
 // endregion
 
 // region - poller API
+
+func (s *poller) Metrics() []string {
+	var result []string
+	for _, c := range s.config.Channels {
+		for _, d := range c.Devices {
+			for _, r := range d.Registers {
+				metric := fmt.Sprintf("%s:%s:%s:%s", c.Title, d.Title, r.Title, r.Mode)
+				if r.Mode == model.RO || r.Mode == model.RW {
+					v, e := s.Read(cacheKey(c.Title, d.Title, r.Title))
+					if nil != e {
+						metric = fmt.Sprintf("%s : %s", metric, e)
+					} else {
+						f, e := ToFloat64(v)
+						if nil != e {
+							metric = fmt.Sprintf("%s : %s", metric, e)
+						} else {
+							metric = fmt.Sprintf("%s : %.2f", metric, f)
+						}
+					}
+				}
+				result = append(result, metric)
+			}
+		}
+	}
+	return result
+}
 
 func (s *poller) Start() {
 	if nil == s.scheduler {
@@ -122,9 +149,8 @@ func (s *poller) cycle() {
 	}
 	wg.Wait()
 }
-
 func (s *poller) readChannel(chn model.Channel) error {
-	log.Info("~~~~~~~~ read channel '%s' [cp: %d, rp: %d]", chn.Title, chn.GetCyclePause(), chn.GetRegisterPause())
+	//log.Info("~~~~~~~~ read channel '%s' [cp: %d, rp: %d]", chn.Title, chn.GetCyclePause(), chn.GetRegisterPause())
 	client := s.clients[chn.Title]
 	reader := NewReader(s.config, client)
 	for _, dev := range chn.Devices {
@@ -134,7 +160,7 @@ func (s *poller) readChannel(chn model.Channel) error {
 				l := fmt.Sprintf("read register: %s:%s:%s ->", chn.Title, dev.Title, reg.Title)
 				result, err := reader.Read(&reg)
 				if nil == err {
-					log.Info("%s %f", l, result)
+					//log.Info("%s %f", l, result)
 					s.dc[cacheKey(chn.Title, dev.Title, reg.Title)] = result
 				} else {
 					log.Info("%s Error: %s", l, err)

@@ -30,6 +30,7 @@ type CachedModbusAPI interface {
 	Stop(w http.ResponseWriter, r *http.Request)
 	Cycle(w http.ResponseWriter, r *http.Request)
 	Get(w http.ResponseWriter, r *http.Request)
+	Metrics(w http.ResponseWriter, r *http.Request)
 }
 
 func (c *cachedModbusController) Start(w http.ResponseWriter, r *http.Request) {
@@ -57,6 +58,12 @@ func (c *cachedModbusController) Get(w http.ResponseWriter, r *http.Request) {
 		} else {
 			w.Write([]byte(fmt.Sprintf("%.2f\n", result)))
 		}
+	}
+}
+
+func (c *cachedModbusController) Metrics(w http.ResponseWriter, r *http.Request) {
+	for _, m := range c.poller.Metrics() {
+		w.Write([]byte(fmt.Sprintf("%s\n", m)))
 	}
 }
 
