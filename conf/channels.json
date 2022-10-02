@@ -1,0 +1,187 @@
+{
+  "channels": [
+    {
+      "mode": "enc",
+      "title": "wb-mge-01",
+      "connection": "localhost:20108",
+      "devices": [
+        {
+          "title": "vent",
+          "slave_id": 93,
+          "registers": [
+            {
+              "title": "on-off",
+              "type": "coil",
+              "mode": "wo",
+              "address": 5101
+            },
+            {
+              "title": "speed1",
+              "type": "coil",
+              "mode": "wo",
+              "address": 5102
+            },
+            {
+              "title": "speed2",
+              "type": "coil",
+              "mode": "wo",
+              "address": 5103
+            },
+            {
+              "title": "speed3",
+              "type": "coil",
+              "mode": "wo",
+              "address": 5104
+            },
+            {
+              "title": "ventilate",
+              "type": "coil",
+              "mode": "wo",
+              "address": 5105
+            },
+            {
+              "title": "recuperate",
+              "type": "coil",
+              "mode": "wo",
+              "address": 5106
+            }
+          ]
+        },
+        {
+          "title": "aircon",
+          "slave_id": 87,
+          "registers": [
+            {
+              "title": "off",
+              "type": "coil",
+              "mode": "wo",
+              "address": 5102
+            },
+            {
+              "title": "n1",
+              "type": "coil",
+              "mode": "wo",
+              "address": 5101
+            },
+            {
+              "title": "n2",
+              "type": "coil",
+              "mode": "wo",
+              "address": 5105
+            },
+            {
+              "title": "c1",
+              "type": "coil",
+              "mode": "wo",
+              "address": 5109
+            },
+            {
+              "title": "c2",
+              "type": "coil",
+              "mode": "wo",
+              "address": 5108
+            },
+            {
+              "title": "c3",
+              "type": "coil",
+              "mode": "wo",
+              "address": 5107
+            }
+          ]
+        },
+        {
+          "title": "msw-k",
+          "slave_id": 12,
+          "registers": [
+            {
+              "title": "temperature",
+              "type": "input",
+              "address": 0,
+              "factor": 0.1
+            },
+            {
+              "title": "Temperature",
+              "type": "input",
+              "address": 4,
+              "factor": 0.01
+            },
+            {
+              "title": "humidity",
+              "type": "input",
+              "address": 1,
+              "factor": 0.1
+            },
+            {
+              "title": "Humidity",
+              "type": "input",
+              "address": 5,
+              "factor": 0.01
+            },
+            {
+              "title": "noise",
+              "type": "input",
+              "address": 3,
+              "factor": 0.01
+            },
+            {
+              "title": "CO2",
+              "type": "input",
+              "address": 8
+            },
+            {
+              "title": "air_quality",
+              "type": "input",
+              "address": 11
+            }
+          ]
+        },
+        {
+          "title": "msw-b",
+          "slave_id": 11,
+          "registers": [
+            {
+              "title": "temperature",
+              "type": "input",
+              "address": 0,
+              "factor": 0.1
+            },
+            {
+              "title": "Temperature",
+              "type": "input",
+              "address": 4,
+              "factor": 0.01
+            },
+            {
+              "title": "humidity",
+              "type": "input",
+              "address": 1,
+              "factor": 0.1
+            },
+            {
+              "title": "Humidity",
+              "type": "input",
+              "address": 5,
+              "factor": 0.01
+            },
+            {
+              "title": "noise",
+              "type": "input",
+              "address": 3,
+              "factor": 0.01
+            },
+            {
+              "title": "CO2",
+              "type": "input",
+              "address": 8
+            },
+            {
+              "title": "air_quality",
+              "type": "input",
+              "address": 11
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

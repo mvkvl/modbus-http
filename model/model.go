@@ -226,11 +226,13 @@ type Device struct {
 // region - Register
 
 type Register struct {
+	Device  *Device `json:"-"`
 	Type    RegType `json:"type,string,omitempty"`
 	Mode    RegMode `json:"mode,string,omitempty"`
 	Title   string  `json:"title,omitempty"`
 	Address uint16  `json:"address,omitempty"`
 	Size    uint16  `json:"size,omitempty"`
+	Factor  float32 `json:"factor,omitempty"`
 }
 
 func (r Register) String() string {
@@ -269,6 +271,16 @@ func (r *Register) UnmarshalJSON(data []byte) (err error) {
 		register.Size = uint16(v)
 	} else {
 		register.Size = 1
+	}
+	if nil != obj["factor"] {
+		v, _ := strconv.ParseFloat(fmt.Sprint(obj["factor"]), 32)
+		if err != nil {
+			//log.Fatalf("%q\n", err)
+			v = 1.0
+		}
+		register.Factor = float32(v)
+	} else {
+		register.Factor = 1.0
 	}
 	*r = register
 	return nil

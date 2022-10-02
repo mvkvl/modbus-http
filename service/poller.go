@@ -32,6 +32,7 @@ type PollerServiceAPI interface {
 	WriteByte(key string, value uint8, callback func()) error
 	WriteWord(key string, value uint16, callback func()) error
 	WriteValue(key string, value float32, callback func()) error
+	destroy()
 }
 
 type PollerService struct {
@@ -44,7 +45,7 @@ type PollerService struct {
 	poller    chrono.ScheduledTask // poller task
 }
 
-func NewModbusPoller(handlerFactory func(connection string, mode model.Mode) modbus.ClientHandler, config *model.Config) PollerServiceAPI {
+func CreateModbusPoller(handlerFactory func(connection string, mode model.Mode) modbus.ClientHandler, config *model.Config) PollerServiceAPI {
 	var clients = make(map[string]*modbus.Client)
 	for _, chn := range config.Channels {
 		handler := handlerFactory(chn.Connection, chn.Mode)
@@ -57,6 +58,10 @@ func NewModbusPoller(handlerFactory func(connection string, mode model.Mode) mod
 		dc:      make(map[string]any),
 		cq:      queue.CreateQueue(),
 	}
+}
+
+func DestroyModbusPoller(poller *PollerServiceAPI) {
+	(*poller).destroy()
 }
 
 // endregion
@@ -107,6 +112,9 @@ func (s *PollerService) WriteValue(key string, value float32, callback func()) e
 // endregion
 
 // region - private methods
+
+func (s *PollerService) destroy() {
+}
 
 func (s *PollerService) cycle() {
 	var wg = &sync.WaitGroup{}

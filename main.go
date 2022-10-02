@@ -6,6 +6,7 @@ import (
 	log "github.com/jeanphorn/log4go"
 	"github.com/mvkvl/modbus"
 	"github.com/mvkvl/modbus-http/controller"
+	"github.com/mvkvl/modbus-http/device"
 	"github.com/mvkvl/modbus-http/model"
 	"github.com/mvkvl/modbus-http/service"
 	"net/http"
@@ -13,8 +14,20 @@ import (
 	"time"
 )
 
+//<<<<<<< HEAD
+//	"github.com/mvkvl/modbus-http/controller"
+//=======
+//	"github.com/mvkvl/modbus-http/device"
+//>>>>>>> master
+//	"github.com/mvkvl/modbus-http/model"
+//	"github.com/mvkvl/modbus-http/service"
+//	"net/http"
+//	"os"
+//	"time"
+//)
+
 const (
-	gateway = "localhost:20108"
+	gateway = "mge:20108"
 )
 
 func main() {
@@ -22,16 +35,47 @@ func main() {
 	log.LoadConfiguration("./conf/logger.json")
 	defer log.Close()
 
-	//config, err := readConfig("./conf/channels.json")
-	//if nil != err {
-	//	log.Error("error reading config: %s", err)
-	//	return
-	//}
+	config, err := readConfig("./conf/channels.json")
+	if nil != err {
+		log.Error("error reading config: %s", err)
+		return
+	}
 
-	//printConfig(config)
+	printConfig(config)
 	//pollerTest(config)
 	//startServer(config)
 
+	//config, err := readConfig("./conf/channels.json")
+	//if nil != err {
+	//	log.Fatalf("error reading config: %s", err)
+	//	return
+	//}
+	////printConfig(config)
+	//modbusClient := createModbusClient()
+	//readRegister(&modbusClient, config, "wb-mge-01:msw-k:temperature")
+	//readRegister(&modbusClient, config, "wb-mge-01:msw-k:Temperature")
+	//readRegister(&modbusClient, config, "wb-mge-01:msw-k:humidity")
+	//readRegister(&modbusClient, config, "wb-mge-01:msw-k:Humidity")
+	//readRegister(&modbusClient, config, "wb-mge-01:msw-k:noise")
+	//readRegister(&modbusClient, config, "wb-mge-01:msw-k:CO2")
+	//readRegister(&modbusClient, config, "wb-mge-01:msw-k:air_quality")
+	//log.Println("-----------------------------------------------")
+	//readRegister(&modbusClient, config, "wb-mge-01:msw-b:temperature")
+	//readRegister(&modbusClient, config, "wb-mge-01:msw-b:Temperature")
+	//readRegister(&modbusClient, config, "wb-mge-01:msw-b:humidity")
+	//readRegister(&modbusClient, config, "wb-mge-01:msw-b:Humidity")
+	//readRegister(&modbusClient, config, "wb-mge-01:msw-b:noise")
+	//readRegister(&modbusClient, config, "wb-mge-01:msw-b:CO2")
+	//readRegister(&modbusClient, config, "wb-mge-01:msw-b:air_quality")
+}
+
+func readRegister(client *modbus.Client, config *model.Config, reference string) {
+	v, t, err := device.ReadFloat(client, config, reference)
+	if nil != err {
+		log.Warn("%s\n", err)
+	} else {
+		log.Info("%-11s: %.2f", t, v)
+	}
 }
 
 func readConfig(path string) (*model.Config, error) {
@@ -43,6 +87,16 @@ func readConfig(path string) (*model.Config, error) {
 	if err := json.Unmarshal(content, &config); err != nil {
 		return nil, err
 	}
+	// add back-reference from register to device
+	for i := 0; i < len(config.Channels); i++ {
+		c := config.Channels[i]
+		for j := 0; j < len(c.Devices); j++ {
+			d := c.Devices[j]
+			for k := 0; k < len(d.Registers); k++ {
+				d.Registers[k].Device = &d
+			}
+		}
+	}
 	return &config, nil
 }
 func printConfig(config *model.Config) {
@@ -52,14 +106,16 @@ func printConfig(config *model.Config) {
 		for _, d := range c.Devices {
 			log.Info("\t%s:%d", d.Title, d.SlaveId)
 			for _, r := range d.Registers {
-				log.Info("\t\taddr: %4d, size: %2d, type: %7s, mode: %s", r.Address, r.Size, r.Type, r.Mode)
+				log.Info(
+					"\t\taddr: %4d, size: %2d, type: %7s, mode: %s, factor: %f, dev: %s",
+					r.Address, r.Size, r.Type, r.Mode, r.Factor, r.Device.Title)
 			}
 		}
 	}
 }
 
 func pollerTest(config *model.Config) {
-	//poller := service.NewModbusPoller(modbusHandlerFactory, config)
+	//poller := service.CreateModbusPoller(modbusHandlerFactory, config)
 	//log.Println("poller start 1")
 	//poller.Start()
 	//time.Sleep(35 * time.Second)
@@ -87,8 +143,9 @@ func pollerTest(config *model.Config) {
 
 func startServer(config *model.Config) {
 
-	poller := service.NewModbusPoller(modbusHandlerFactory, config)
+	poller := service.CreateModbusPoller(modbusHandlerFactory, config)
 	poller.Start()
+	defer service.DestroyModbusPoller(&poller)
 
 	directModbusService := controller.NewDirectModbusClient(modbus.NewClient(modbusHandlerFactory(gateway, model.ENC)))
 	cachedModbusService := controller.NewCachedModbusClient(poller)
