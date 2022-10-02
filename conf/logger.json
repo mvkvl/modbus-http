@@ -1,0 +1,7 @@
+{
+  "console": {
+    "enable": true,
+    "level": "TRACE",
+    "pattern": "[%D %T] [%C] [%L] %M"
+  }
+}

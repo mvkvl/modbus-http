@@ -12,12 +12,12 @@ import (
 
 // region - service
 
-type DirectModbusController struct {
+type directModbusController struct {
 	client modbus.Client
 }
 
 func NewDirectModbusClient(client modbus.Client) DirectModbusAPI {
-	return &DirectModbusController{
+	return &directModbusController{
 		client: client,
 	}
 }
@@ -35,22 +35,22 @@ type DirectModbusAPI interface {
 	WriteHolding(w http.ResponseWriter, r *http.Request)
 }
 
-func (s *DirectModbusController) ReadCoil(w http.ResponseWriter, r *http.Request) {
+func (s *directModbusController) ReadCoil(w http.ResponseWriter, r *http.Request) {
 	read(w, r, s.client.ReadCoils)
 }
-func (s *DirectModbusController) ReadDiscrete(w http.ResponseWriter, r *http.Request) {
+func (s *directModbusController) ReadDiscrete(w http.ResponseWriter, r *http.Request) {
 	read(w, r, s.client.ReadDiscreteInputs)
 }
-func (s *DirectModbusController) ReadInput(w http.ResponseWriter, r *http.Request) {
+func (s *directModbusController) ReadInput(w http.ResponseWriter, r *http.Request) {
 	read(w, r, s.client.ReadInputRegisters)
 }
-func (s *DirectModbusController) ReadHolding(w http.ResponseWriter, r *http.Request) {
+func (s *directModbusController) ReadHolding(w http.ResponseWriter, r *http.Request) {
 	read(w, r, s.client.ReadHoldingRegisters)
 }
-func (s *DirectModbusController) WriteCoil(w http.ResponseWriter, r *http.Request) {
+func (s *directModbusController) WriteCoil(w http.ResponseWriter, r *http.Request) {
 	write(w, r, s.client.WriteSingleCoil, true)
 }
-func (s *DirectModbusController) WriteHolding(w http.ResponseWriter, r *http.Request) {
+func (s *directModbusController) WriteHolding(w http.ResponseWriter, r *http.Request) {
 	write(w, r, s.client.WriteSingleRegister, false)
 }
 

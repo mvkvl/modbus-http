@@ -9,7 +9,6 @@ import (
 	"github.com/mvkvl/modbus"
 	"github.com/mvkvl/modbus-http/model"
 	"github.com/mvkvl/modbus-http/queue"
-	"github.com/procyon-projects/chrono"
 	"sync"
 	"time"
 )
@@ -25,34 +24,33 @@ import (
 
 // region - poller service
 
-type PollerServiceAPI interface {
-	Start()
-	Stop()
-	Read(key string) (any, error)
-	WriteByte(key string, value uint8, callback func()) error
-	WriteWord(key string, value uint16, callback func()) error
-	WriteValue(key string, value float32, callback func()) error
-	destroy()
-}
-
-type PollerService struct {
+type poller struct {
 	clients   map[string]*modbus.Client // channels' modbus client
 	config    *model.Config             // channels config
 	m         sync.Mutex                // mutex for concurrent access synchronization
 	dc        map[string]any            // data cache
 	cq        queue.FifoQueue           // commands queue
-	scheduler chrono.TaskScheduler
-	poller    chrono.ScheduledTask // poller task
+	scheduler *Scheduler                // poller task scheduler
 }
 
-func CreateModbusPoller(handlerFactory func(connection string, mode model.Mode) modbus.ClientHandler, config *model.Config) PollerServiceAPI {
+type Poller interface {
+	Start()
+	Stop()
+	Cycle()
+	Read(key string) (any, error)
+	WriteByte(key string, value uint8, callback func()) error
+	WriteWord(key string, value uint16, callback func()) error
+	WriteValue(key string, value float32, callback func()) error
+}
+
+func CreateModbusPoller(handlerFactory func(connection string, mode model.Mode) modbus.ClientHandler, config *model.Config) Poller {
 	var clients = make(map[string]*modbus.Client)
 	for _, chn := range config.Channels {
 		handler := handlerFactory(chn.Connection, chn.Mode)
 		client := modbus.NewClient(handler)
 		clients[chn.Title] = &client
 	}
-	return &PollerService{
+	return &poller{
 		clients: clients,
 		config:  config,
 		dc:      make(map[string]any),
@@ -60,34 +58,30 @@ func CreateModbusPoller(handlerFactory func(connection string, mode model.Mode) 
 	}
 }
 
-func DestroyModbusPoller(poller *PollerServiceAPI) {
-	(*poller).destroy()
-}
-
 // endregion
 
 // region - poller API
 
-func (s *PollerService) Start() {
-	//if nil == s.scheduler || s.scheduler.IsShutdown() || nil == s.poller || s.poller.IsCancelled() {
-	//	s.scheduler = chrono.NewDefaultTaskScheduler()
-	//	//s.poller, _ = s.scheduler.ScheduleWithFixedDelay(func(ctx context.Context) {
-	//	s.poller, _ = s.scheduler.ScheduleAtFixedRate(func(ctx context.Context) {
-	//		s.cycle()
-	//	}, 10000*time.Millisecond)
-	//}
+func (s *poller) Start() {
+	if nil == s.scheduler {
+		sh := NewScheduler()
+		s.scheduler = &sh
+		(*s.scheduler).RunWithFixedDelay(s.cycle, 100*time.Millisecond)
+	}
 }
-func (s *PollerService) Stop() {
-	//if nil != s.poller && !s.poller.IsCancelled() {
-	//	s.poller.Cancel()
-	//	s.poller = nil
-	//}
-	//if nil != s.scheduler && !s.scheduler.IsShutdown() {
-	//	s.scheduler.Shutdown()
-	//	s.scheduler = nil
-	//}
+func (s *poller) Stop() {
+	if nil != s.scheduler {
+		(*s.scheduler).Stop()
+		s.scheduler = nil
+	}
 }
-func (s *PollerService) Read(key string) (any, error) {
+func (s *poller) Cycle() {
+	if nil == s.scheduler {
+		s.cycle()
+	}
+}
+
+func (s *poller) Read(key string) (any, error) {
 	s.m.Lock()
 	defer s.m.Unlock()
 	if val, ok := s.dc[key]; ok {
@@ -96,15 +90,15 @@ func (s *PollerService) Read(key string) (any, error) {
 		return nil, errors.New(fmt.Sprintf("no metric found for key '%s'", key))
 	}
 }
-func (s *PollerService) WriteByte(key string, value uint8, callback func()) error {
+func (s *poller) WriteByte(key string, value uint8, callback func()) error {
 	//TODO implement me
 	panic("implement me")
 }
-func (s *PollerService) WriteWord(key string, value uint16, callback func()) error {
+func (s *poller) WriteWord(key string, value uint16, callback func()) error {
 	//TODO implement me
 	panic("implement me")
 }
-func (s *PollerService) WriteValue(key string, value float32, callback func()) error {
+func (s *poller) WriteValue(key string, value float32, callback func()) error {
 	//TODO implement me
 	panic("implement me")
 }
@@ -113,10 +107,7 @@ func (s *PollerService) WriteValue(key string, value float32, callback func()) e
 
 // region - private methods
 
-func (s *PollerService) destroy() {
-}
-
-func (s *PollerService) cycle() {
+func (s *poller) cycle() {
 	var wg = &sync.WaitGroup{}
 	for _, chn := range s.config.Channels {
 		wg.Add(1)
@@ -126,42 +117,32 @@ func (s *PollerService) cycle() {
 			}
 			//if err := s.writeChannel(chn); err != nil {
 			//}
+			wg.Done()
 		}(chn)
 	}
 	wg.Wait()
 }
 
-func (s *PollerService) readChannel(chn model.Channel) error {
-	log.Info("~~~~~~~~ read channel '%s' [cp: %d, rp: %d]", chn.Title, chn.CyclePause, chn.RegisterPause)
+func (s *poller) readChannel(chn model.Channel) error {
+	log.Info("~~~~~~~~ read channel '%s' [cp: %d, rp: %d]", chn.Title, chn.GetCyclePause(), chn.GetRegisterPause())
 	client := s.clients[chn.Title]
+	reader := NewReader(s.config, client)
 	for _, dev := range chn.Devices {
 		for _, reg := range dev.Registers {
 			if reg.Mode == model.RO || reg.Mode == model.RW {
+				time.Sleep(time.Duration(chn.GetRegisterPause()) * time.Millisecond)
 				l := fmt.Sprintf("read register: %s:%s:%s ->", chn.Title, dev.Title, reg.Title)
-				var result []uint8
-				var err error
-				switch reg.Type {
-				case model.COIL:
-					result, err = (*client).ReadCoils(dev.SlaveId, reg.Address, reg.Size)
-				case model.DISCRETE:
-					result, err = (*client).ReadDiscreteInputs(dev.SlaveId, reg.Address, reg.Size)
-				case model.INPUT:
-					result, err = (*client).ReadInputRegisters(dev.SlaveId, reg.Address, reg.Size)
-				case model.HOLDING:
-					result, err = (*client).ReadHoldingRegisters(dev.SlaveId, reg.Address, reg.Size)
-				}
-				time.Sleep(time.Duration(chn.RegisterPause) * time.Millisecond)
+				result, err := reader.Read(&reg)
 				if nil == err {
-					log.Info("%s % x", l, result)
+					log.Info("%s %f", l, result)
 					s.dc[cacheKey(chn.Title, dev.Title, reg.Title)] = result
 				} else {
 					log.Info("%s Error: %s", l, err)
-					//return err
 				}
 			}
 		}
 	}
-	time.Sleep(time.Duration(chn.CyclePause) * time.Millisecond)
+	time.Sleep(time.Duration(chn.GetCyclePause()) * time.Millisecond)
 	return nil
 }
 

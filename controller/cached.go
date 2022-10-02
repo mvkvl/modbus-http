@@ -13,12 +13,12 @@ import (
 
 // region - service
 
-type CachedModbusController struct {
-	service service.PollerServiceAPI // poller service
+type cachedModbusController struct {
+	poller service.Poller // poller service
 }
 
-func NewCachedModbusClient(service service.PollerServiceAPI) CachedModbusAPI {
-	return &CachedModbusController{service: service}
+func NewCachedModbusClient(poller service.Poller) CachedModbusAPI {
+	return &cachedModbusController{poller: poller}
 }
 
 // endregion
@@ -28,28 +28,34 @@ func NewCachedModbusClient(service service.PollerServiceAPI) CachedModbusAPI {
 type CachedModbusAPI interface {
 	Start(w http.ResponseWriter, r *http.Request)
 	Stop(w http.ResponseWriter, r *http.Request)
+	Cycle(w http.ResponseWriter, r *http.Request)
 	Get(w http.ResponseWriter, r *http.Request)
 }
 
-func (c *CachedModbusController) Start(w http.ResponseWriter, r *http.Request) {
-	c.service.Start()
+func (c *cachedModbusController) Start(w http.ResponseWriter, r *http.Request) {
+	c.poller.Start()
 	w.Write([]byte(fmt.Sprintf("ok\n")))
 }
 
-func (c *CachedModbusController) Stop(w http.ResponseWriter, r *http.Request) {
-	c.service.Stop()
+func (c *cachedModbusController) Cycle(w http.ResponseWriter, r *http.Request) {
+	c.poller.Cycle()
 	w.Write([]byte(fmt.Sprintf("ok\n")))
 }
 
-func (c *CachedModbusController) Get(w http.ResponseWriter, r *http.Request) {
-	result, err := c.service.Read(getMetricKey(r))
+func (c *cachedModbusController) Stop(w http.ResponseWriter, r *http.Request) {
+	c.poller.Stop()
+	w.Write([]byte(fmt.Sprintf("ok\n")))
+}
+
+func (c *cachedModbusController) Get(w http.ResponseWriter, r *http.Request) {
+	result, err := c.poller.Read(getMetricKey(r))
 	if nil != err {
 		w.Write([]byte(fmt.Sprintf("%q\n", err)))
 	} else {
 		if nil == result {
 			w.Write([]byte(fmt.Sprintf("none")))
 		} else {
-			w.Write([]byte(fmt.Sprintf("% x\n", result)))
+			w.Write([]byte(fmt.Sprintf("%.2f\n", result)))
 		}
 	}
 }

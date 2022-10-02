@@ -13,13 +13,18 @@ import (
 
 // region - reader type
 
-type Reader struct {
+type reader struct {
 	Config *model.Config
 	Client *modbus.Client
 }
 
-func NewReader(config *model.Config, client *modbus.Client) ReaderAPI {
-	return &Reader{
+type Reader interface {
+	Read(register *model.Register) (result float64, err error)
+	ReadRef(reference string) (result float64, title string, err error)
+}
+
+func NewReader(config *model.Config, client *modbus.Client) Reader {
+	return &reader{
 		Config: config,
 		Client: client,
 	}
@@ -29,12 +34,7 @@ func NewReader(config *model.Config, client *modbus.Client) ReaderAPI {
 
 // region - public API
 
-type ReaderAPI interface {
-	ReadFloatRegister(register *model.Register) (result float64, err error)
-	ReadFloat(reference string) (result float64, title string, err error)
-}
-
-func (reader *Reader) ReadFloatRegister(register *model.Register) (result float64, err error) {
+func (reader *reader) Read(register *model.Register) (result float64, err error) {
 	buff, err := reader.getReaderFunction(register)(register.Device.SlaveId, register.Address, register.Size)
 	if nil != err {
 		return 0, err
@@ -64,12 +64,13 @@ func (reader *Reader) ReadFloatRegister(register *model.Register) (result float6
 		return math.NaN(), errors.New("readFloat: unknown value is of incompatible type")
 	}
 }
-func (reader *Reader) ReadFloat(reference string) (result float64, title string, err error) {
+
+func (reader *reader) ReadRef(reference string) (result float64, title string, err error) {
 	reg, err := reader.findRegister(reference)
 	if nil != err {
 		return 0, "", err
 	}
-	v, e := reader.ReadFloatRegister(reg)
+	v, e := reader.Read(reg)
 	return v, reg.Title, e
 }
 
@@ -77,7 +78,7 @@ func (reader *Reader) ReadFloat(reference string) (result float64, title string,
 
 // region - private methods
 
-func (reader *Reader) getReaderFunction(register *model.Register) func(slaveId uint8, address, quantity uint16) (results []byte, err error) {
+func (reader *reader) getReaderFunction(register *model.Register) func(slaveId uint8, address, quantity uint16) (results []byte, err error) {
 	switch register.Type {
 	case model.COIL:
 		return (*reader.Client).ReadCoils
@@ -90,7 +91,7 @@ func (reader *Reader) getReaderFunction(register *model.Register) func(slaveId u
 	}
 }
 
-func (reader *Reader) findChannelByTitle(title string) (*model.Channel, error) {
+func (reader *reader) findChannelByTitle(title string) (*model.Channel, error) {
 	for _, v := range reader.Config.Channels {
 		if v.Title == title {
 			return &v, nil
@@ -98,7 +99,7 @@ func (reader *Reader) findChannelByTitle(title string) (*model.Channel, error) {
 	}
 	return nil, errors.New(fmt.Sprintf("no channel found for title '%s'", title))
 }
-func (reader *Reader) findDeviceByTitle(channel *model.Channel, title string) (*model.Device, error) {
+func (reader *reader) findDeviceByTitle(channel *model.Channel, title string) (*model.Device, error) {
 	for _, v := range channel.Devices {
 		if v.Title == title {
 			return &v, nil
@@ -106,7 +107,7 @@ func (reader *Reader) findDeviceByTitle(channel *model.Channel, title string) (*
 	}
 	return nil, errors.New(fmt.Sprintf("no device found for title '%s'", title))
 }
-func (reader *Reader) findRegisterByTitle(device *model.Device, title string) (*model.Register, error) {
+func (reader *reader) findRegisterByTitle(device *model.Device, title string) (*model.Register, error) {
 	for _, v := range device.Registers {
 		if v.Title == title {
 			return &v, nil
@@ -114,7 +115,7 @@ func (reader *Reader) findRegisterByTitle(device *model.Device, title string) (*
 	}
 	return nil, errors.New(fmt.Sprintf("no register found for title '%s'", title))
 }
-func (reader *Reader) findRegister(reference string) (*model.Register, error) {
+func (reader *reader) findRegister(reference string) (*model.Register, error) {
 	ref := strings.Split(reference, ":")
 	if 3 != len(ref) {
 		return nil, errors.New(fmt.Sprintf("invalid reference passed: '%s'", reference))
