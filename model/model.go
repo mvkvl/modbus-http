@@ -174,15 +174,41 @@ type Config struct {
 
 // region - Channel
 
+const (
+	DefaultCyclePollPause    = 100
+	DefaultRegisterPollPause = 10
+)
+
 type Channel struct {
-	Mode       Mode     `json:"mode,omitempty"`
-	Title      string   `json:"title,omitempty"`
-	Connection string   `json:"connection,omitempty"`
-	Devices    []Device `json:"devices,omitempty"`
+	Mode          Mode     `json:"mode,omitempty"`
+	Title         string   `json:"title,omitempty"`
+	Connection    string   `json:"connection,omitempty"`
+	CyclePause    int      `json:"cycle_pause,omitempty"`
+	RegisterPause int      `json:"register_pause,omitempty"`
+	Devices       []Device `json:"devices,omitempty"`
 }
 
 func (c Channel) String() string {
-	return fmt.Sprintf("mode: %s, conn: %s, devices: %d", c.Mode, c.Connection, len(c.Devices))
+	return fmt.Sprintf(
+		"mode: %s, conn: %s, devices: %d, cpause: %d, rpause: %d",
+		c.Mode, c.Connection, len(c.Devices), c.GetCyclePause(), c.GetRegisterPause(),
+	)
+}
+
+func (c Channel) GetCyclePause() int {
+	if c.CyclePause <= 0 {
+		return DefaultCyclePollPause
+	} else {
+		return c.CyclePause
+	}
+}
+
+func (c Channel) GetRegisterPause() int {
+	if c.RegisterPause <= 0 {
+		return DefaultRegisterPollPause
+	} else {
+		return c.RegisterPause
+	}
 }
 
 // endregion

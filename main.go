@@ -2,52 +2,35 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
 	"github.com/gorilla/mux"
+	log "github.com/jeanphorn/log4go"
 	"github.com/mvkvl/modbus"
-	"github.com/mvkvl/modbus-http/device"
+	"github.com/mvkvl/modbus-http/controller"
 	"github.com/mvkvl/modbus-http/model"
-	"log"
+	"github.com/mvkvl/modbus-http/service"
 	"net/http"
 	"os"
+	"sync"
 	"time"
 )
 
-const (
-	gateway = "mge:20108"
-)
-
 func main() {
+
+	log.LoadConfiguration("./conf/logger.json")
+	defer log.Close()
+
 	config, err := readConfig("./conf/channels.json")
 	if nil != err {
-		log.Fatalf("error reading config: %s", err)
+		log.Info("error reading config: %s\n", err)
 		return
 	}
-	//printConfig(config)
-	modbusClient := createModbusClient()
-	readRegister(&modbusClient, config, "wb-mge-01:msw-k:temperature")
-	readRegister(&modbusClient, config, "wb-mge-01:msw-k:Temperature")
-	readRegister(&modbusClient, config, "wb-mge-01:msw-k:humidity")
-	readRegister(&modbusClient, config, "wb-mge-01:msw-k:Humidity")
-	readRegister(&modbusClient, config, "wb-mge-01:msw-k:noise")
-	readRegister(&modbusClient, config, "wb-mge-01:msw-k:CO2")
-	readRegister(&modbusClient, config, "wb-mge-01:msw-k:air_quality")
-	log.Println("-----------------------------------------------")
-	readRegister(&modbusClient, config, "wb-mge-01:msw-b:temperature")
-	readRegister(&modbusClient, config, "wb-mge-01:msw-b:Temperature")
-	readRegister(&modbusClient, config, "wb-mge-01:msw-b:humidity")
-	readRegister(&modbusClient, config, "wb-mge-01:msw-b:Humidity")
-	readRegister(&modbusClient, config, "wb-mge-01:msw-b:noise")
-	readRegister(&modbusClient, config, "wb-mge-01:msw-b:CO2")
-	readRegister(&modbusClient, config, "wb-mge-01:msw-b:air_quality")
-}
 
-func readRegister(client *modbus.Client, config *model.Config, reference string) {
-	v, t, err := device.ReadFloat(client, config, reference)
-	if nil != err {
-		log.Fatalf("%s\n", err)
-	} else {
-		log.Printf("%-11s: %.2f", t, v)
-	}
+	printConfig(config)
+	startServer(config)
+	//schedulerTestAfter()
+	//schedulerTestFixedRate()
+	//schedulerTestFixedDelay()
 }
 
 func readConfig(path string) (*model.Config, error) {
@@ -73,48 +56,94 @@ func readConfig(path string) (*model.Config, error) {
 }
 func printConfig(config *model.Config) {
 	for _, c := range config.Channels {
-		log.Printf("title: %s, conn: %s, mode: %s\n", c.Title, c.Connection, c.Mode)
+		log.Info("title: %s, conn: %s, mode: %s, cpause: %d, rpause: %d",
+			c.Title, c.Connection, c.Mode, c.GetCyclePause(), c.GetRegisterPause())
 		for _, d := range c.Devices {
-			log.Printf("\t%s:%d\n", d.Title, d.SlaveId)
+			log.Info("\t%s:%d", d.Title, d.SlaveId)
 			for _, r := range d.Registers {
-				log.Printf(
-					"\t\taddr: %4d, size: %2d, type: %7s, mode: %s, factor: %f, dev: %s\n",
+				log.Info(
+					"\t\taddr: %4d, size: %2d, type: %7s, mode: %s, factor: %f, dev: %s",
 					r.Address, r.Size, r.Type, r.Mode, r.Factor, r.Device.Title)
 			}
 		}
 	}
 }
-func createModbusClient() modbus.Client {
-	handler := modbus.NewEncClientHandler(gateway)
-	handler.IdleTimeout = 2 * time.Second
-	handler.Timeout = 1 * time.Second
-	//handler.Logger = log.New(os.Stdout, "tcp: ", log.LstdFlags|log.Lmicroseconds)
-	defer handler.Close()
-	client := modbus.NewClient(handler)
-	return client
-}
-func startServer(client *modbus.Client) {
+func startServer(config *model.Config) {
 
-	server := &Server{
-		client: *client,
-	}
+	poller := service.CreateModbusPoller(modbusHandlerFactory, config)
+	poller.Start()
+	defer service.DestroyModbusPoller(&poller)
+
+	//directModbusService := controller.NewDirectModbusClient(modbus.NewClient(modbusHandlerFactory(gateway, model.ENC)))
+	cachedModbusService := controller.NewCachedModbusClient(poller)
 
 	r := mux.NewRouter()
-	r.HandleFunc("/c/{slaveId}/{address}", server.ReadCoil).Methods("GET")
-	r.HandleFunc("/d/{slaveId}/{address}", server.ReadDiscrete).Methods("GET")
-	r.HandleFunc("/i/{slaveId}/{address}", server.ReadInput).Methods("GET")
-	r.HandleFunc("/h/{slaveId}/{address}", server.ReadHolding).Methods("GET")
-
-	r.HandleFunc("/c/{slaveId}/{address}", server.WriteCoil).Methods("POST")
-	r.HandleFunc("/h/{slaveId}/{address}", server.WriteHolding).Methods("POST")
+	r.HandleFunc("/start", cachedModbusService.Start).Methods("POST")
+	r.HandleFunc("/stop", cachedModbusService.Stop).Methods("POST")
+	r.HandleFunc("/cycle", cachedModbusService.Cycle).Methods("POST")
+	r.HandleFunc("/metric/{metric}", cachedModbusService.Get).Methods("GET")
 
 	// Bind to a port and pass our router in
-	log.Fatal(http.ListenAndServe(":80", r))
+	log.Warn(http.ListenAndServe(":8080", r))
 }
 
-//v, err := device.ReadFloatRegister(&modbusClient, &config.Channels[0].Devices[2].Registers[0])
-//res, _ := modbusClient.ReadHoldingRegisters(12, 0, 1)
-//val := binary.BigEndian.Uint16(res)
-//fmt.Printf("% x => %d\n", res, val)
-//startServer(&modbusClient)
-//eval := goval.NewEvaluator()
+func schedulerTestAfter() {
+	var wg = &sync.WaitGroup{}
+	s := service.NewScheduler()
+	wg.Add(1)
+
+	s.RunAfter(func() {
+		blockedScheduledPayloadTest(service.RandomString(10), wg)
+		wg.Done()
+	}, 1*time.Second)
+
+	wg.Wait()
+}
+func schedulerTestFixedRate() {
+	var wg = &sync.WaitGroup{}
+	s := service.NewScheduler()
+	time.AfterFunc(7*time.Second, s.Stop)
+	s.RunAtFixedRate(func() { blockedScheduledPayloadTest(service.RandomString(10), wg) }, 1*time.Second)
+	time.Sleep(1 * time.Second)
+	s.RunAfter(func() { blockedScheduledPayloadTest(service.RandomString(10), wg) }, 1*time.Second)
+	wg.Wait()
+}
+func schedulerTestFixedDelay() {
+	var wg = &sync.WaitGroup{}
+	s := service.NewScheduler()
+	wg.Add(1)
+	//time.AfterFunc(16*time.Second, s.Stop)
+	s.RunWithFixedDelay(func() { blockedScheduledPayloadTest(service.RandomString(10), wg) }, 1*time.Second)
+	wg.Wait()
+}
+
+func blockedScheduledPayloadTest(id string, wg *sync.WaitGroup) {
+	wg.Add(1)
+	scheduledPayloadTest(id)
+	wg.Done()
+}
+func scheduledPayloadTest(id string) {
+	log.Info(fmt.Sprintf("%s: started", id))
+	time.Sleep(5 * time.Second)
+	log.Info(fmt.Sprintf("%s: finished", id))
+}
+
+func modbusHandlerFactory(connection string, mode model.Mode) modbus.ClientHandler {
+	switch mode {
+	case model.ENC:
+		_handler := modbus.NewEncClientHandler(connection)
+		_handler.IdleTimeout = 2 * time.Second
+		_handler.Timeout = 1 * time.Second
+		//_handler.Logger = log.New(os.Stdout, fmt.Sprintf("[%s]: ", connection), log.LstdFlags|log.Lmicroseconds)
+		return _handler
+	case model.TCP:
+		_handler := modbus.NewTCPClientHandler(connection)
+		//_handler.Logger = log.New(os.Stdout, fmt.Sprintf("[%s]: ", connection), log.LstdFlags|log.Lmicroseconds)
+		return _handler
+	case model.RTU:
+		_handler := modbus.NewRTUClientHandler(connection)
+		//_handler.Logger = log.New(os.Stdout, fmt.Sprintf("[%s]: ", connection), log.LstdFlags|log.Lmicroseconds)
+		return _handler
+	}
+	return nil
+}

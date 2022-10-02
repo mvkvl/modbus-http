@@ -3,7 +3,9 @@
     {
       "mode": "enc",
       "title": "wb-mge-01",
-      "connection": "localhost:20108",
+      "connection": "mge:20108",
+      "cycle_pause": 500,
+      "register_pause": 10,
       "devices": [
         {
           "title": "vent",
