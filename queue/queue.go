@@ -8,10 +8,8 @@ import (
 // region => constants
 
 const (
-	MinCapacity    = 1
-	MaxCapacity    = 2000000
-	CapacityLimit  = 0.7
-	CapacityFactor = 2
+	MinCapacity = 1
+	MaxCapacity = 2000000
 )
 
 // endregion

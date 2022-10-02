@@ -1,4 +1,4 @@
-package main
+package controller
 
 import (
 	"fmt"
@@ -10,29 +10,53 @@ import (
 	"strconv"
 )
 
-type Server struct {
+// region - service
+
+type DirectModbusController struct {
 	client modbus.Client
 }
 
-func (s *Server) ReadCoil(w http.ResponseWriter, r *http.Request) {
-	read(w, r, s.client.ReadCoils)
-}
-func (s *Server) ReadDiscrete(w http.ResponseWriter, r *http.Request) {
-	read(w, r, s.client.ReadDiscreteInputs)
-}
-func (s *Server) ReadInput(w http.ResponseWriter, r *http.Request) {
-	read(w, r, s.client.ReadInputRegisters)
-}
-func (s *Server) ReadHolding(w http.ResponseWriter, r *http.Request) {
-	read(w, r, s.client.ReadHoldingRegisters)
+func NewDirectModbusClient(client modbus.Client) DirectModbusAPI {
+	return &DirectModbusController{
+		client: client,
+	}
 }
 
-func (s *Server) WriteCoil(w http.ResponseWriter, r *http.Request) {
+// endregion
+
+// region - controller API
+
+type DirectModbusAPI interface {
+	ReadCoil(w http.ResponseWriter, r *http.Request)
+	ReadDiscrete(w http.ResponseWriter, r *http.Request)
+	ReadInput(w http.ResponseWriter, r *http.Request)
+	ReadHolding(w http.ResponseWriter, r *http.Request)
+	WriteCoil(w http.ResponseWriter, r *http.Request)
+	WriteHolding(w http.ResponseWriter, r *http.Request)
+}
+
+func (s *DirectModbusController) ReadCoil(w http.ResponseWriter, r *http.Request) {
+	read(w, r, s.client.ReadCoils)
+}
+func (s *DirectModbusController) ReadDiscrete(w http.ResponseWriter, r *http.Request) {
+	read(w, r, s.client.ReadDiscreteInputs)
+}
+func (s *DirectModbusController) ReadInput(w http.ResponseWriter, r *http.Request) {
+	read(w, r, s.client.ReadInputRegisters)
+}
+func (s *DirectModbusController) ReadHolding(w http.ResponseWriter, r *http.Request) {
+	read(w, r, s.client.ReadHoldingRegisters)
+}
+func (s *DirectModbusController) WriteCoil(w http.ResponseWriter, r *http.Request) {
 	write(w, r, s.client.WriteSingleCoil, true)
 }
-func (s *Server) WriteHolding(w http.ResponseWriter, r *http.Request) {
+func (s *DirectModbusController) WriteHolding(w http.ResponseWriter, r *http.Request) {
 	write(w, r, s.client.WriteSingleRegister, false)
 }
+
+// endregion
+
+// region - private methods
 
 func read(w http.ResponseWriter, r *http.Request, reader func(uint8, uint16, uint16) ([]byte, error)) {
 	vars := mux.Vars(r)
@@ -71,3 +95,5 @@ func write(w http.ResponseWriter, r *http.Request, writer func(uint8, uint16, ui
 	}
 	w.WriteHeader(http.StatusOK)
 }
+
+// endregion
