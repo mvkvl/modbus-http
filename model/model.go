@@ -2,6 +2,7 @@ package model
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strconv"
 	"strings"
@@ -170,6 +171,31 @@ type Config struct {
 	Channels []Channel `json:"channels,omitempty"`
 }
 
+func (config *Config) FindChannelByTitle(title string) (*Channel, error) {
+	for _, v := range config.Channels {
+		if v.Title == title {
+			return &v, nil
+		}
+	}
+	return nil, errors.New(fmt.Sprintf("no channel found for title '%s'", title))
+}
+func (config *Config) FindRegister(reference string) (*Register, error) {
+	ref := strings.Split(reference, ":")
+	if 3 != len(ref) {
+		return nil, errors.New(fmt.Sprintf("invalid reference passed: '%s'", reference))
+	}
+	c, err := config.FindChannelByTitle(strings.TrimSpace(ref[0]))
+	if nil != err {
+		return nil, err
+	}
+	d, err := c.findDeviceByTitle(strings.TrimSpace(ref[1]))
+	if nil != err {
+		return nil, err
+	}
+	r, err := d.findRegisterByTitle(strings.TrimSpace(ref[2]))
+	return r, err
+}
+
 // endregion
 
 // region - Channel
@@ -211,6 +237,15 @@ func (c Channel) GetRegisterPause() int {
 	}
 }
 
+func (c Channel) findDeviceByTitle(title string) (*Device, error) {
+	for _, v := range c.Devices {
+		if v.Title == title {
+			return &v, nil
+		}
+	}
+	return nil, errors.New(fmt.Sprintf("no device found for title '%s'", title))
+}
+
 // endregion
 
 // region - Device
@@ -219,6 +254,15 @@ type Device struct {
 	SlaveId   uint8      `json:"slave_id,omitempty"`
 	Title     string     `json:"title,omitempty"`
 	Registers []Register `json:"registers,omitempty"`
+}
+
+func (d *Device) findRegisterByTitle(title string) (*Register, error) {
+	for _, v := range d.Registers {
+		if v.Title == title {
+			return &v, nil
+		}
+	}
+	return nil, errors.New(fmt.Sprintf("no register found for title '%s'", title))
 }
 
 // endregion

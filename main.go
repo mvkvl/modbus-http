@@ -81,6 +81,7 @@ func startServer(config *model.Config) {
 	r.HandleFunc("/cycle", cachedModbusService.Cycle).Methods("POST")
 	r.HandleFunc("/metrics", cachedModbusService.Metrics).Methods("GET")
 	r.HandleFunc("/metric/{metric}", cachedModbusService.Get).Methods("GET")
+	r.HandleFunc("/metric/{metric}", cachedModbusService.Write).Methods("POST")
 
 	// Bind to a port and pass our router in
 	log.Warn(http.ListenAndServe(":8080", r))
