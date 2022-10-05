@@ -35,7 +35,7 @@ type poller struct {
 	clients   map[string]*modbus.Client  // channels' modbus client
 	config    *model.Config              // channels config
 	m         sync.Mutex                 // mutex for concurrent access synchronization
-	dc        map[string]any             // data cache
+	dc        map[string]*model.Metric   // data cache
 	cq        map[string]queue.FifoQueue // commands queue (per channel)
 	scheduler *Scheduler                 // poller task scheduler
 }
@@ -44,7 +44,7 @@ type Poller interface {
 	Start()
 	Stop()
 	Cycle()
-	Read(key string) (any, error)
+	Read(key string) (*model.Metric, error)
 	WriteByte(key string, value uint8, callback func()) error
 	WriteWord(key string, value uint16, callback func()) error
 	Metrics() []string
@@ -60,7 +60,7 @@ func CreateModbusPoller(handlerFactory func(connection string, mode model.Mode) 
 	return &poller{
 		clients: clients,
 		config:  config,
-		dc:      make(map[string]any),
+		dc:      make(map[string]*model.Metric),
 		cq:      make(map[string]queue.FifoQueue),
 	}
 }
@@ -80,11 +80,8 @@ func (s *poller) Metrics() []string {
 					if nil != e {
 						metric = fmt.Sprintf("%s : %s", metric, e)
 					} else {
-						f, e := ToFloat64(v)
-						if nil != e {
-							metric = fmt.Sprintf("%s : %s", metric, e)
-						} else {
-							metric = fmt.Sprintf("%s : %.2f", metric, f)
+						if v.Timestamp.After(time.Now().Add(time.Second * time.Duration(-s.config.Ttl))) {
+							metric = fmt.Sprintf("%s : 0x%04x %.2f %s", metric, v.RawValue, v.Value, v.Timestamp.Format(time.RFC3339))
 						}
 					}
 				}
@@ -97,6 +94,7 @@ func (s *poller) Metrics() []string {
 
 func (s *poller) Start() {
 	if nil == s.scheduler {
+		log.Info("poller start")
 		sh := NewScheduler()
 		s.scheduler = &sh
 		(*s.scheduler).RunWithFixedDelay(s.cycle, 100*time.Millisecond)
@@ -104,6 +102,7 @@ func (s *poller) Start() {
 }
 func (s *poller) Stop() {
 	if nil != s.scheduler {
+		log.Info("poller stop")
 		(*s.scheduler).Stop()
 		s.scheduler = nil
 	}
@@ -114,7 +113,7 @@ func (s *poller) Cycle() {
 	}
 }
 
-func (s *poller) Read(key string) (any, error) {
+func (s *poller) Read(key string) (*model.Metric, error) {
 	s.m.Lock()
 	defer s.m.Unlock()
 	if val, ok := s.dc[key]; ok {
@@ -171,11 +170,18 @@ func (s *poller) readChannel(mb *ModbusClient, chn model.Channel) {
 		for _, reg := range dev.Registers {
 			if reg.Mode == model.RO || reg.Mode == model.RW {
 				time.Sleep(time.Duration(chn.GetRegisterPause()) * time.Millisecond)
-				l := fmt.Sprintf("read register: %s:%s:%s ->", chn.Title, dev.Title, reg.Title)
-				result, err := (*mb).Read(&reg)
+				regKey := fmt.Sprintf("%s:%s:%s", chn.Title, dev.Title, reg.Title)
+				l := fmt.Sprintf("read register: %s ->", regKey)
+				raw, value, err := (*mb).Read(&reg)
 				if nil == err {
 					//log.Info("%s %f", l, result)
-					s.dc[cacheKey(chn.Title, dev.Title, reg.Title)] = result
+					m := &model.Metric{
+						Key:       regKey,
+						RawValue:  raw,
+						Value:     value,
+						Timestamp: time.Now(),
+					}
+					s.dc[cacheKey(chn.Title, dev.Title, reg.Title)] = m
 				} else {
 					log.Info("%s Error: %s", l, err)
 				}

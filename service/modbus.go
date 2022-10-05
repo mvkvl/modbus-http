@@ -19,8 +19,8 @@ type modbusClient struct {
 }
 
 type Reader interface {
-	Read(register *model.Register) (result float64, err error)
-	ReadRef(reference string) (result float64, title string, err error)
+	Read(register *model.Register) (raw uint16, value float64, err error)
+	ReadRef(reference string) (raw uint16, value float64, title string, err error)
 }
 
 type Writer interface {
@@ -46,14 +46,14 @@ func NewModbusClient(config *model.Config, client *modbus.Client) ModbusClient {
 
 // region -> read
 
-func (client *modbusClient) Read(register *model.Register) (result float64, err error) {
+func (client *modbusClient) Read(register *model.Register) (raw uint16, value float64, err error) {
 	buff, err := client.getReaderFunction(register)(register.Device.SlaveId, register.Address, register.Size)
 	if nil != err {
-		return 0, err
+		return 0, 0, err
 	}
 	var val uint16
 	if 0 == len(buff) {
-		return 0, errors.New("no value")
+		return 0, 0, errors.New("no value")
 	} else if 1 == len(buff) {
 		val = uint16(buff[0])
 	} else if 2 == len(buff) {
@@ -67,22 +67,22 @@ func (client *modbusClient) Read(register *model.Register) (result float64, err 
 
 	switch i := v.(type) {
 	case float64:
-		return i, nil
+		return val, i, nil
 	case float32:
-		return float64(i), nil
+		return val, float64(i), nil
 	case int64:
-		return float64(i), nil
+		return val, float64(i), nil
 	default:
-		return math.NaN(), errors.New("readFloat: unknown value is of incompatible type")
+		return val, math.NaN(), errors.New("readFloat: unknown value is of incompatible type")
 	}
 }
-func (client *modbusClient) ReadRef(reference string) (result float64, title string, err error) {
+func (client *modbusClient) ReadRef(reference string) (raw uint16, value float64, title string, err error) {
 	reg, err := client.Config.FindRegister(reference)
 	if nil != err {
-		return 0, "", err
+		return 0, 0, "", err
 	}
-	v, e := client.Read(reg)
-	return v, reg.Title, e
+	r, v, e := client.Read(reg)
+	return r, v, reg.Title, e
 }
 
 // endregion

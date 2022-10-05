@@ -55,6 +55,7 @@ func readConfig(path string) (*model.Config, error) {
 	return &config, nil
 }
 func printConfig(config *model.Config) {
+	log.Info("TTL: %d, PROMETHEUS: %t", config.Ttl, config.PrometheusExport)
 	for _, c := range config.Channels {
 		log.Info("title: %s, conn: %s, mode: %s, cpause: %d, rpause: %d",
 			c.Title, c.Connection, c.Mode, c.GetCyclePause(), c.GetRegisterPause())

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+	"time"
 )
 
 // region => enums
@@ -168,7 +169,9 @@ func (t *RegMode) UnmarshalJSON(data []byte) (err error) {
 // region - Config
 
 type Config struct {
-	Channels []Channel `json:"channels,omitempty"`
+	Ttl              int       `json:"ttl,omitempty"`
+	PrometheusExport bool      `json:"export_prometheus,omitempty"`
+	Channels         []Channel `json:"channels,omitempty"`
 }
 
 func (config *Config) FindChannelByTitle(title string) (*Channel, error) {
@@ -331,5 +334,16 @@ func (r *Register) UnmarshalJSON(data []byte) (err error) {
 }
 
 // endregion
+
+type Metric struct {
+	Key       string    `json:"-"`
+	RawValue  uint16    `json:"-"`
+	Value     float64   `json:"-"`
+	Timestamp time.Time `json:"-"`
+}
+
+func (m Metric) String() string {
+	return fmt.Sprintf("key: %s, raw: %s, ts: %s", m.Key, m.RawValue, m.Timestamp)
+}
 
 // endregion
