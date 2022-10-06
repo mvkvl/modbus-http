@@ -30,6 +30,7 @@ func NewCachedModbusClient(poller service.Poller) CachedModbusAPI {
 //region - controller API
 
 type CachedModbusAPI interface {
+	Status(w http.ResponseWriter, r *http.Request)
 	Start(w http.ResponseWriter, r *http.Request)
 	Stop(w http.ResponseWriter, r *http.Request)
 	Cycle(w http.ResponseWriter, r *http.Request)
@@ -39,6 +40,9 @@ type CachedModbusAPI interface {
 	Write(w http.ResponseWriter, r *http.Request)
 }
 
+func (c *cachedModbusController) Status(w http.ResponseWriter, r *http.Request) {
+	w.Write([]byte(fmt.Sprintf("%s\n", c.poller.Status())))
+}
 func (c *cachedModbusController) Start(w http.ResponseWriter, r *http.Request) {
 	c.poller.Start()
 	w.Write([]byte(fmt.Sprintf("ok\n")))

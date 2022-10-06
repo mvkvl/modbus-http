@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"flag"
 	"fmt"
 	"github.com/gorilla/mux"
 	log "github.com/jeanphorn/log4go"
@@ -11,26 +12,40 @@ import (
 	"github.com/mvkvl/modbus-http/service"
 	"net/http"
 	"os"
-	"sync"
 	"time"
 )
 
 func main() {
 
-	log.LoadConfiguration("./conf/logger.json")
-	defer log.Close()
+	channelConfigFilePtr := flag.String("c", "", "channel configuration file")
+	loggingConfigFilePtr := flag.String("l", "", "logging configuration file")
+	portPtr := flag.Int("p", 8080, "http port to bind to")
+	debugFlag := flag.Bool("d", false, "debug output")
 
-	config, err := readConfig("./conf/channels.json")
-	if nil != err {
-		log.Info("error reading config: %s\n", err)
+	flag.Parse()
+
+	if nil == channelConfigFilePtr || "" == *channelConfigFilePtr {
+		fmt.Println("Error: no channel configuration file passed")
 		return
 	}
 
-	printConfig(config)
-	startServer(config)
-	//schedulerTestAfter()
-	//schedulerTestFixedRate()
-	//schedulerTestFixedDelay()
+	if nil != loggingConfigFilePtr && "" != *loggingConfigFilePtr {
+		log.LoadConfiguration(*loggingConfigFilePtr)
+	} else {
+		log.Close()
+	}
+	defer log.Close()
+
+	config, err := readConfig(*channelConfigFilePtr)
+	if nil != err {
+		fmt.Sprintf("Error: could not read config file: %s\n", err)
+		return
+	}
+
+	if *debugFlag {
+		printConfig(config)
+	}
+	startServer(config, *portPtr)
 }
 
 func readConfig(path string) (*model.Config, error) {
@@ -55,21 +70,21 @@ func readConfig(path string) (*model.Config, error) {
 	return &config, nil
 }
 func printConfig(config *model.Config) {
-	log.Info("TTL: %d, PROMETHEUS: %t", config.Ttl, config.PrometheusExport)
+	fmt.Printf("ttl: %d seconds,\nprometheus enabled: %t\nchannels:\n", config.Ttl, config.PrometheusExport)
 	for _, c := range config.Channels {
-		log.Info("title: %s, conn: %s, mode: %s, cpause: %d, rpause: %d",
+		fmt.Printf("\ttitle: %s, conn: %s, mode: %s, cpause: %d, rpause: %d\n",
 			c.Title, c.Connection, c.Mode, c.GetCyclePause(), c.GetRegisterPause())
 		for _, d := range c.Devices {
-			log.Info("\t%s:%d", d.Title, d.SlaveId)
+			fmt.Printf("\t\t%s:%d\n", d.Title, d.SlaveId)
 			for _, r := range d.Registers {
-				log.Info(
-					"\t\taddr: %4d, size: %2d, type: %7s, mode: %s, factor: %f, dev: %s",
+				fmt.Printf(
+					"\t\t\taddr: %4d, size: %2d, type: %7s, mode: %s, factor: %.2f, dev: %s\n",
 					r.Address, r.Size, r.Type, r.Mode, r.Factor, r.Device.Title)
 			}
 		}
 	}
 }
-func startServer(config *model.Config) {
+func startServer(config *model.Config, port int) {
 
 	poller := service.CreateModbusPoller(modbusHandlerFactory, config)
 	poller.Start()
@@ -77,6 +92,7 @@ func startServer(config *model.Config) {
 	cachedModbusService := controller.NewCachedModbusClient(poller)
 
 	r := mux.NewRouter()
+	r.HandleFunc("/status", cachedModbusService.Status).Methods("GET")
 	r.HandleFunc("/start", cachedModbusService.Start).Methods("POST")
 	r.HandleFunc("/stop", cachedModbusService.Stop).Methods("POST")
 	r.HandleFunc("/cycle", cachedModbusService.Cycle).Methods("POST")
@@ -89,48 +105,7 @@ func startServer(config *model.Config) {
 	}
 
 	// Bind to a port and pass our router in
-	log.Warn(http.ListenAndServe(":8080", r))
-}
-
-func schedulerTestAfter() {
-	var wg = &sync.WaitGroup{}
-	s := service.NewScheduler()
-	wg.Add(1)
-
-	s.RunAfter(func() {
-		blockedScheduledPayloadTest(service.RandomString(10), wg)
-		wg.Done()
-	}, 1*time.Second)
-
-	wg.Wait()
-}
-func schedulerTestFixedRate() {
-	var wg = &sync.WaitGroup{}
-	s := service.NewScheduler()
-	time.AfterFunc(7*time.Second, s.Stop)
-	s.RunAtFixedRate(func() { blockedScheduledPayloadTest(service.RandomString(10), wg) }, 1*time.Second)
-	time.Sleep(1 * time.Second)
-	s.RunAfter(func() { blockedScheduledPayloadTest(service.RandomString(10), wg) }, 1*time.Second)
-	wg.Wait()
-}
-func schedulerTestFixedDelay() {
-	var wg = &sync.WaitGroup{}
-	s := service.NewScheduler()
-	wg.Add(1)
-	//time.AfterFunc(16*time.Second, s.Stop)
-	s.RunWithFixedDelay(func() { blockedScheduledPayloadTest(service.RandomString(10), wg) }, 1*time.Second)
-	wg.Wait()
-}
-
-func blockedScheduledPayloadTest(id string, wg *sync.WaitGroup) {
-	wg.Add(1)
-	scheduledPayloadTest(id)
-	wg.Done()
-}
-func scheduledPayloadTest(id string) {
-	log.Info(fmt.Sprintf("%s: started", id))
-	time.Sleep(5 * time.Second)
-	log.Info(fmt.Sprintf("%s: finished", id))
+	log.Warn(http.ListenAndServe(fmt.Sprintf(":%d", port), r))
 }
 
 func modbusHandlerFactory(connection string, mode model.Mode) modbus.ClientHandler {

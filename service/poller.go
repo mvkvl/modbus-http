@@ -41,6 +41,7 @@ type poller struct {
 }
 
 type Poller interface {
+	Status() string
 	Start()
 	Stop()
 	Cycle()
@@ -123,6 +124,13 @@ func (s *poller) Prometheus() []string {
 	return result
 }
 
+func (s *poller) Status() string {
+	if nil == s.scheduler {
+		return "poller is stopped"
+	} else {
+		return "poller is running"
+	}
+}
 func (s *poller) Start() {
 	if nil == s.scheduler {
 		log.Info("poller start")
