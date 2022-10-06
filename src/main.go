@@ -21,7 +21,7 @@ func main() {
 }
 
 func testApp() {
-	config, err := readConfig("./conf/channels.json")
+	config, err := readConfig("../conf/channels.json")
 	if nil != err {
 		fmt.Printf("Error: could not read config file: %s\n", err)
 		return

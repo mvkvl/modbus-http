@@ -1,3 +1,5 @@
 #!/usr/bin/env bash
 
-rm -rf ./distr/mbridge_*
+DIR="$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
+
+rm -rf "${DIR}/distr/mbridge_*"
