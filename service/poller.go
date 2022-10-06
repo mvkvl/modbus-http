@@ -48,6 +48,7 @@ type Poller interface {
 	WriteByte(key string, value uint8, callback func()) error
 	WriteWord(key string, value uint16, callback func()) error
 	Metrics() []string
+	Prometheus() []string
 }
 
 func CreateModbusPoller(handlerFactory func(connection string, mode model.Mode) modbus.ClientHandler, config *model.Config) Poller {
@@ -87,6 +88,35 @@ func (s *poller) Metrics() []string {
 					}
 				}
 				result = append(result, metric)
+			}
+		}
+	}
+	return result
+}
+
+func (s *poller) Prometheus() []string {
+	var result []string
+	for _, c := range s.config.Channels {
+		for _, d := range c.Devices {
+			for _, r := range d.Registers {
+				if r.Mode == model.RO || r.Mode == model.RW {
+					template := "modbus_metric_%s{channel=\"%s\",device=\"%s\",register=\"%s\"} %s"
+					v, e := s.Read(cacheKey(c.Title, d.Title, r.Title))
+					if nil != e {
+						err := fmt.Sprintf(fmt.Sprintf(template, "error", c.Title, d.Title, r.Title, "%s"), e)
+						result = append(result, err)
+					} else {
+						if s.config.Ttl > 0 && v.Timestamp.After(time.Now().Add(time.Second*time.Duration(-s.config.Ttl))) ||
+							s.config.Ttl <= 0 {
+							raw := fmt.Sprintf(fmt.Sprintf(template, "raw", c.Title, d.Title, r.Title, "%d"), v.RawValue)
+							val := fmt.Sprintf(fmt.Sprintf(template, "value", c.Title, d.Title, r.Title, "%f"), v.Value)
+							ts := fmt.Sprintf(fmt.Sprintf(template, "timestamp", c.Title, d.Title, r.Title, "%s"), v.Timestamp.Format(time.RFC3339))
+							result = append(result, raw)
+							result = append(result, val)
+							result = append(result, ts)
+						}
+					}
+				}
 			}
 		}
 	}

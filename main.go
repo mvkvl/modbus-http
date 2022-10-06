@@ -84,6 +84,10 @@ func startServer(config *model.Config) {
 	r.HandleFunc("/metric/{metric}", cachedModbusService.Get).Methods("GET")
 	r.HandleFunc("/metric/{metric}", cachedModbusService.Write).Methods("POST")
 
+	if config.PrometheusExport {
+		r.HandleFunc("/metrics/prometheus", cachedModbusService.PrometheusMetrics).Methods("GET")
+	}
+
 	// Bind to a port and pass our router in
 	log.Warn(http.ListenAndServe(":8080", r))
 }

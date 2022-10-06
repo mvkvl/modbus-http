@@ -34,6 +34,7 @@ type CachedModbusAPI interface {
 	Stop(w http.ResponseWriter, r *http.Request)
 	Cycle(w http.ResponseWriter, r *http.Request)
 	Metrics(w http.ResponseWriter, r *http.Request)
+	PrometheusMetrics(w http.ResponseWriter, r *http.Request)
 	Get(w http.ResponseWriter, r *http.Request)
 	Write(w http.ResponseWriter, r *http.Request)
 }
@@ -55,6 +56,12 @@ func (c *cachedModbusController) Stop(w http.ResponseWriter, r *http.Request) {
 
 func (c *cachedModbusController) Metrics(w http.ResponseWriter, r *http.Request) {
 	for _, m := range c.poller.Metrics() {
+		w.Write([]byte(fmt.Sprintf("%s\n", m)))
+	}
+}
+
+func (c *cachedModbusController) PrometheusMetrics(w http.ResponseWriter, r *http.Request) {
+	for _, m := range c.poller.Prometheus() {
 		w.Write([]byte(fmt.Sprintf("%s\n", m)))
 	}
 }
