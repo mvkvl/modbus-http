@@ -16,7 +16,19 @@ import (
 )
 
 func main() {
+	//testApp()
+	runApp()
+}
 
+func testApp() {
+	config, err := readConfig("./conf/channels.json")
+	if nil != err {
+		fmt.Printf("Error: could not read config file: %s\n", err)
+		return
+	}
+	printConfig(config)
+}
+func runApp() {
 	channelConfigFilePtr := flag.String("c", "", "channel configuration file")
 	loggingConfigFilePtr := flag.String("l", "", "logging configuration file")
 	portPtr := flag.Int("p", 8080, "http port to bind to")
@@ -38,7 +50,7 @@ func main() {
 
 	config, err := readConfig(*channelConfigFilePtr)
 	if nil != err {
-		fmt.Sprintf("Error: could not read config file: %s\n", err)
+		fmt.Printf("Error: could not read config file: %s\n", err)
 		return
 	}
 
@@ -47,7 +59,6 @@ func main() {
 	}
 	startServer(config, *portPtr)
 }
-
 func readConfig(path string) (*model.Config, error) {
 	content, err := os.ReadFile(path)
 	if err != nil {
@@ -75,7 +86,7 @@ func printConfig(config *model.Config) {
 		fmt.Printf("\ttitle: %s, conn: %s, mode: %s, cpause: %d, rpause: %d\n",
 			c.Title, c.Connection, c.Mode, c.GetCyclePause(), c.GetRegisterPause())
 		for _, d := range c.Devices {
-			fmt.Printf("\t\t%s:%d\n", d.Title, d.SlaveId)
+			fmt.Printf("\t\t%s (%s):%d\n", d.Title, d.Alias, d.SlaveId)
 			for _, r := range d.Registers {
 				fmt.Printf(
 					"\t\t\taddr: %4d, size: %2d, type: %7s, mode: %s, factor: %.2f, dev: %s\n",
