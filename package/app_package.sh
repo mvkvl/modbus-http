@@ -1,0 +1,46 @@
+#!/usr/bin/env bash
+
+VERSION=$1
+if [ -z $VERSION ]; then
+  VERSION=0.0.1
+else
+  shift
+fi
+
+./app_build.sh
+
+DSTPATH="./distr"
+SRCDIR="$DSTPATH/bin/linux"
+
+# https://www.internalpointers.com/post/build-binary-deb-package-practical-guide
+function package_deb() {
+  ARCH=$1
+  DSTPATH=$2
+  DSTDIR="${DSTPATH}/mbridge_${VERSION}_${ARCH}"
+  mkdir -p "$DSTDIR/DEBIAN"
+  install -d "${DSTDIR}/etc/mbridge"
+  install -d "${DSTDIR}/usr/local/bin"
+  install -d "${DSTDIR}/etc/systemd/system"
+  install -m 0644 "./debian/mbridge.service"  "${DSTDIR}/etc/systemd/system/mbridge.service"
+  install -m 0644 "../conf/channels.json"     "${DSTDIR}/etc/mbridge/channels.json"
+  install -m 0644 "../conf/logger.json"       "${DSTDIR}/etc/mbridge/logger.json"
+  install -m 0755 "${SRCDIR}/${ARCH}/mbridge" "${DSTDIR}/usr/local/bin/mbridge"
+  {
+    echo "Package: mbridge"
+    echo "Version: ${VERSION}"
+    echo "Architecture: ${ARCH}"
+    echo "Maintainer: Mikhail Kantur <mkantur@gmail.com>"
+    echo "Description: modbus-to-http bridging service"
+    echo "Depends: systemd"
+    echo ""
+  } > "$DSTDIR/DEBIAN/control"
+  install -m 755 "./debian/mbridge.postinst" "$DSTDIR/DEBIAN/postinst"
+  install -m 755 "./debian/mbridge.postrm"   "$DSTDIR/DEBIAN/postrm"
+  dpkg-deb --build --root-owner-group "${DSTDIR}"
+  rm -rf "${DSTDIR}"
+}
+
+package_deb amd64   "${DSTPATH}"
+package_deb armhf   "${DSTPATH}"
+package_deb armhf64 "${DSTPATH}"
+
