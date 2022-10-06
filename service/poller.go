@@ -97,6 +97,12 @@ func (s *poller) Metrics() []string {
 
 func (s *poller) Prometheus() []string {
 	var result []string
+	template := "modbus_poller_active %d"
+	if nil == s.scheduler {
+		result = append(result, fmt.Sprintf(template, 0))
+	} else {
+		result = append(result, fmt.Sprintf(template, 1))
+	}
 	for _, c := range s.config.Channels {
 		for _, d := range c.Devices {
 			for _, r := range d.Registers {
