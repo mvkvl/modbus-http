@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+
+systemctl daemon-reload
+systemctl enable mbridge
+systemctl start mbridge
