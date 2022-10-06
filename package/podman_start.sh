@@ -1,3 +1,6 @@
+echo
+echo " == PODMAN START"
+echo
 podman run --rm -v $(pwd)/..:/src                 \
            -ti                                    \
            --name debian                          \

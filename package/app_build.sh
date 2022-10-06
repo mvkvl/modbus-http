@@ -25,9 +25,11 @@
 # armel (softfloat)               GOARM=5
 # armhf (hardware floating point) GOARM=6 / GOARM=7
 
+DIR="$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
+
 DSTPATH=$1
 if [ -z $DSTPATH ]; then
-  DSTPATH="./distr"
+  DSTPATH="${DIR}/distr"
 fi
 
 function cleanup {
@@ -36,8 +38,13 @@ function cleanup {
 
 function build() {
   mkdir -p ${DSTPATH}/bin/$4/$5/
-  GOOS=$1 GOARCH=$2 GOARM=$3 go build -o ${DSTPATH}/bin/$4/$5/mbridge ..
+  cd ${DIR}/../src
+  GOOS=$1 GOARCH=$2 GOARM=$3 go build -ldflags "-s -w" -o ${DSTPATH}/bin/$4/$5/mbridge .
 }
+
+echo
+echo "BUILDING mbridge"
+echo
 
 cleanup                                     && \
 build linux   amd64   ""    linux   amd64   && \
