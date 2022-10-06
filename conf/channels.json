@@ -136,6 +136,22 @@
               "title": "air_quality",
               "type": "input",
               "address": 11
+            },
+            {
+              "title": "motion",
+              "type": "input",
+              "address": 283
+            },
+            {
+              "title": "max_motion",
+              "type": "input",
+              "address": 280
+            },
+            {
+              "title": "luminance",
+              "type": "input",
+              "size": 2,
+              "address": 9
             }
           ]
         },
@@ -182,6 +198,22 @@
               "title": "air_quality",
               "type": "input",
               "address": 11
+            },
+            {
+              "title": "motion",
+              "type": "input",
+              "address": 283
+            },
+            {
+              "title": "max_motion",
+              "type": "input",
+              "address": 280
+            },
+            {
+              "title": "luminance",
+              "type": "input",
+              "size": 2,
+              "address": 9
             }
           ]
         }

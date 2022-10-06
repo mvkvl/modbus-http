@@ -337,7 +337,7 @@ func (r *Register) UnmarshalJSON(data []byte) (err error) {
 
 type Metric struct {
 	Key       string    `json:"-"`
-	RawValue  uint16    `json:"-"`
+	RawValue  any       `json:"-"`
 	Value     float64   `json:"-"`
 	Timestamp time.Time `json:"-"`
 }

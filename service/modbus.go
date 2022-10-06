@@ -19,8 +19,8 @@ type modbusClient struct {
 }
 
 type Reader interface {
-	Read(register *model.Register) (raw uint16, value float64, err error)
-	ReadRef(reference string) (raw uint16, value float64, title string, err error)
+	Read(register *model.Register) (raw uint32, value float64, err error)
+	ReadRef(reference string) (raw uint32, value float64, title string, err error)
 }
 
 type Writer interface {
@@ -46,20 +46,24 @@ func NewModbusClient(config *model.Config, client *modbus.Client) ModbusClient {
 
 // region -> read
 
-func (client *modbusClient) Read(register *model.Register) (raw uint16, value float64, err error) {
+// Read reads up to 2 words of bus data & converts it to uint32
+func (client *modbusClient) Read(register *model.Register) (raw uint32, value float64, err error) {
 	buff, err := client.getReaderFunction(register)(register.Device.SlaveId, register.Address, register.Size)
 	if nil != err {
 		return 0, 0, err
 	}
-	var val uint16
+	var val uint32
 	if 0 == len(buff) {
 		return 0, 0, errors.New("no value")
 	} else if 1 == len(buff) {
-		val = uint16(buff[0])
+		val = uint32(buff[0])
 	} else if 2 == len(buff) {
-		val = binary.BigEndian.Uint16(buff)
+		val = uint32(binary.BigEndian.Uint16(buff))
+	} else if 4 == len(buff) {
+		//log.Warn("NxBuff: % 0x, a: % 0x, b: % 0x\n", buff, buff[:2], buff[2:])
+		val = uint32(binary.BigEndian.Uint16(buff[:2]))<<8 + uint32(binary.BigEndian.Uint16(buff[2:]))
 	} else {
-		val = binary.BigEndian.Uint16(buff)
+		return 0, math.NaN(), errors.New(fmt.Sprintf("Read: too large data chunk received: % 0x", buff))
 	}
 	expression := fmt.Sprintf("%f * %d", register.Factor, val)
 	eval := goval.NewEvaluator()
@@ -73,10 +77,10 @@ func (client *modbusClient) Read(register *model.Register) (raw uint16, value fl
 	case int64:
 		return val, float64(i), nil
 	default:
-		return val, math.NaN(), errors.New("readFloat: unknown value is of incompatible type")
+		return val, math.NaN(), errors.New("Read: unknown value is of incompatible type")
 	}
 }
-func (client *modbusClient) ReadRef(reference string) (raw uint16, value float64, title string, err error) {
+func (client *modbusClient) ReadRef(reference string) (raw uint32, value float64, title string, err error) {
 	reg, err := client.Config.FindRegister(reference)
 	if nil != err {
 		return 0, 0, "", err
