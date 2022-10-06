@@ -95,6 +95,7 @@
         },
         {
           "title": "msw-k",
+          "alias": "kitchen",
           "slave_id": 12,
           "registers": [
             {
@@ -157,6 +158,7 @@
         },
         {
           "title": "msw-b",
+          "alias": "bathroom",
           "slave_id": 11,
           "registers": [
             {
