@@ -110,14 +110,15 @@ func (s *poller) Prometheus() []string {
 					template := "modbus_metric_%s{channel=\"%s\",device=\"%s\",register=\"%s\"} %s"
 					v, e := s.Read(cacheKey(c.Title, d.Title, r.Title))
 					if nil != e {
-						err := fmt.Sprintf(fmt.Sprintf(template, "error", c.Title, d.Title, r.Title, "%s"), e)
-						result = append(result, err)
+						log.Error(fmt.Sprintf(template, "error", c.Title, d.Title, r.Title, "%s"), e)
+						//err := fmt.Sprintf(fmt.Sprintf(template, "error", c.Title, d.Title, r.Title, "%d"), null)
+						//result = append(result, err)
 					} else {
 						if s.config.Ttl > 0 && v.Timestamp.After(time.Now().Add(time.Second*time.Duration(-s.config.Ttl))) ||
 							s.config.Ttl <= 0 {
 							raw := fmt.Sprintf(fmt.Sprintf(template, "raw", c.Title, d.Title, r.Title, "%d"), v.RawValue)
 							val := fmt.Sprintf(fmt.Sprintf(template, "value", c.Title, d.Title, r.Title, "%f"), v.Value)
-							ts := fmt.Sprintf(fmt.Sprintf(template, "timestamp", c.Title, d.Title, r.Title, "%s"), v.Timestamp.Format(time.RFC3339))
+							ts := fmt.Sprintf(fmt.Sprintf(template, "timestamp", c.Title, d.Title, r.Title, "%d"), v.Timestamp.Unix())
 							result = append(result, raw)
 							result = append(result, val)
 							result = append(result, ts)
