@@ -80,7 +80,8 @@ func (s *poller) Metrics() []string {
 					if nil != e {
 						metric = fmt.Sprintf("%s : %s", metric, e)
 					} else {
-						if v.Timestamp.After(time.Now().Add(time.Second * time.Duration(-s.config.Ttl))) {
+						if s.config.Ttl > 0 && v.Timestamp.After(time.Now().Add(time.Second*time.Duration(-s.config.Ttl))) ||
+							s.config.Ttl <= 0 {
 							metric = fmt.Sprintf("%s : 0x%04x %.2f %s", metric, v.RawValue, v.Value, v.Timestamp.Format(time.RFC3339))
 						}
 					}
