@@ -3,10 +3,14 @@
 package controller
 
 import (
+	"errors"
 	"fmt"
 	"github.com/gorilla/mux"
 	"github.com/mvkvl/modbus-http/service"
+	"io"
 	"net/http"
+	"strconv"
+	"strings"
 )
 
 // endregion
@@ -29,8 +33,9 @@ type CachedModbusAPI interface {
 	Start(w http.ResponseWriter, r *http.Request)
 	Stop(w http.ResponseWriter, r *http.Request)
 	Cycle(w http.ResponseWriter, r *http.Request)
-	Get(w http.ResponseWriter, r *http.Request)
 	Metrics(w http.ResponseWriter, r *http.Request)
+	Get(w http.ResponseWriter, r *http.Request)
+	Write(w http.ResponseWriter, r *http.Request)
 }
 
 func (c *cachedModbusController) Start(w http.ResponseWriter, r *http.Request) {
@@ -48,6 +53,12 @@ func (c *cachedModbusController) Stop(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte(fmt.Sprintf("ok\n")))
 }
 
+func (c *cachedModbusController) Metrics(w http.ResponseWriter, r *http.Request) {
+	for _, m := range c.poller.Metrics() {
+		w.Write([]byte(fmt.Sprintf("%s\n", m)))
+	}
+}
+
 func (c *cachedModbusController) Get(w http.ResponseWriter, r *http.Request) {
 	result, err := c.poller.Read(getMetricKey(r))
 	if nil != err {
@@ -61,10 +72,42 @@ func (c *cachedModbusController) Get(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (c *cachedModbusController) Metrics(w http.ResponseWriter, r *http.Request) {
-	for _, m := range c.poller.Metrics() {
-		w.Write([]byte(fmt.Sprintf("%s\n", m)))
+func (c *cachedModbusController) Write(w http.ResponseWriter, r *http.Request) {
+	b, e := io.ReadAll(r.Body)
+	defer r.Body.Close()
+	if nil != e {
+		w.Write([]byte(fmt.Sprintf("Error: %s", e)))
+		return
 	}
+	bodyStr := string(b)
+
+	ok := false
+	v, e := strconv.ParseUint(bodyStr, 10, 64)
+	if nil != e {
+		bodyStr, e = hexaNumberToInteger(bodyStr)
+		if nil != e {
+			w.Write([]byte(fmt.Sprintf("Error: %s", e)))
+			return
+		} else {
+			v, e = strconv.ParseUint(bodyStr, 16, 64)
+			if nil != e {
+				w.Write([]byte(fmt.Sprintf("Error: %s", e)))
+				return
+			} else {
+				ok = true
+			}
+		}
+	} else {
+		ok = true
+	}
+	if ok {
+		e = c.poller.WriteWord(getMetricKey(r), uint16(v), nil)
+		if nil != e {
+			w.Write([]byte(fmt.Sprintf("Error: %s", e)))
+			return
+		}
+	}
+	w.Write([]byte("ok"))
 }
 
 // endregion
@@ -73,6 +116,18 @@ func (c *cachedModbusController) Metrics(w http.ResponseWriter, r *http.Request)
 
 func getMetricKey(r *http.Request) string {
 	return mux.Vars(r)["metric"]
+}
+
+func hexaNumberToInteger(hexaString string) (string, error) {
+	// replace 0x or 0X with empty String
+	if strings.Contains(hexaString, "0x") && 0 == strings.Index(hexaString, "0x") ||
+		strings.Contains(hexaString, "0X") && 0 == strings.Index(hexaString, "0X") {
+		numberStr := strings.Replace(hexaString, "0x", "", -1)
+		numberStr = strings.Replace(numberStr, "0X", "", -1)
+		return numberStr, nil
+	}
+	return "", errors.New("not a hexadecimal string")
+
 }
 
 // endregion

@@ -55,6 +55,7 @@ func readConfig(path string) (*model.Config, error) {
 	return &config, nil
 }
 func printConfig(config *model.Config) {
+	log.Info("TTL: %d, PROMETHEUS: %t", config.Ttl, config.PrometheusExport)
 	for _, c := range config.Channels {
 		log.Info("title: %s, conn: %s, mode: %s, cpause: %d, rpause: %d",
 			c.Title, c.Connection, c.Mode, c.GetCyclePause(), c.GetRegisterPause())
@@ -81,6 +82,7 @@ func startServer(config *model.Config) {
 	r.HandleFunc("/cycle", cachedModbusService.Cycle).Methods("POST")
 	r.HandleFunc("/metrics", cachedModbusService.Metrics).Methods("GET")
 	r.HandleFunc("/metric/{metric}", cachedModbusService.Get).Methods("GET")
+	r.HandleFunc("/metric/{metric}", cachedModbusService.Write).Methods("POST")
 
 	// Bind to a port and pass our router in
 	log.Warn(http.ListenAndServe(":8080", r))

@@ -1,4 +1,6 @@
 {
+  "ttl": 0,
+  "export_prometheus": true,
   "channels": [
     {
       "mode": "enc",
@@ -15,37 +17,37 @@
               "title": "on-off",
               "type": "coil",
               "mode": "wo",
-              "address": 5101
+              "address": 5100
             },
             {
               "title": "speed1",
               "type": "coil",
               "mode": "wo",
-              "address": 5102
+              "address": 5101
             },
             {
               "title": "speed2",
               "type": "coil",
               "mode": "wo",
-              "address": 5103
+              "address": 5102
             },
             {
               "title": "speed3",
               "type": "coil",
               "mode": "wo",
-              "address": 5104
+              "address": 5103
             },
             {
               "title": "ventilate",
               "type": "coil",
               "mode": "wo",
-              "address": 5105
+              "address": 5104
             },
             {
               "title": "recuperate",
               "type": "coil",
               "mode": "wo",
-              "address": 5106
+              "address": 5105
             }
           ]
         },
@@ -57,37 +59,37 @@
               "title": "off",
               "type": "coil",
               "mode": "wo",
-              "address": 5102
+              "address": 5101
             },
             {
               "title": "n1",
               "type": "coil",
               "mode": "wo",
-              "address": 5101
+              "address": 5100
             },
             {
               "title": "n2",
               "type": "coil",
               "mode": "wo",
-              "address": 5105
+              "address": 5104
             },
             {
               "title": "c1",
               "type": "coil",
               "mode": "wo",
-              "address": 5109
+              "address": 5108
             },
             {
               "title": "c2",
               "type": "coil",
               "mode": "wo",
-              "address": 5108
+              "address": 5107
             },
             {
               "title": "c3",
               "type": "coil",
               "mode": "wo",
-              "address": 5107
+              "address": 5106
             }
           ]
         },

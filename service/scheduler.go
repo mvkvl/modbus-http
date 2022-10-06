@@ -74,7 +74,7 @@ func (s *scheduler) runWithFixedDelay(f func(), d time.Duration) {
 	for {
 		f()
 		if !s.started {
-			log.Info("stop fixed delay task")
+			//log.Info("stop fixed delay task")
 			break
 		}
 		time.Sleep(d)
