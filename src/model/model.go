@@ -370,10 +370,10 @@ func (r *Register) UnmarshalJSON(data []byte) (err error) {
 // endregion
 
 type Metric struct {
-	Key       string    `json:"-"`
-	RawValue  any       `json:"-"`
-	Value     float64   `json:"-"`
-	Timestamp time.Time `json:"-"`
+	Key       string    `json:"key"`
+	RawValue  any       `json:"raw"`
+	Value     float64   `json:"value"`
+	Timestamp time.Time `json:"timestamp"`
 }
 
 func (m Metric) String() string {

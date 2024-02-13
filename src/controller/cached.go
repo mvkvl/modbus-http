@@ -3,6 +3,7 @@
 package controller
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"github.com/gorilla/mux"
@@ -73,12 +74,16 @@ func (c *cachedModbusController) PrometheusMetrics(w http.ResponseWriter, r *htt
 func (c *cachedModbusController) Get(w http.ResponseWriter, r *http.Request) {
 	result, err := c.poller.Read(getMetricKey(r))
 	if nil != err {
-		w.Write([]byte(fmt.Sprintf("%q\n", err)))
+		w.WriteHeader(404)
+		w.Write([]byte(fmt.Sprintf("{\"error\": \"%s\"}", err)))
 	} else {
 		if nil == result {
-			w.Write([]byte(fmt.Sprintf("none")))
+			w.WriteHeader(204)
+			w.Write([]byte(fmt.Sprintf("{}")))
 		} else {
-			w.Write([]byte(fmt.Sprintf("%q\n", result)))
+			buff, _ := json.Marshal(result)
+			w.WriteHeader(200)
+			w.Write(buff)
 		}
 	}
 }
