@@ -78,7 +78,7 @@ func (c *cachedModbusController) Get(w http.ResponseWriter, r *http.Request) {
 		if nil == result {
 			w.Write([]byte(fmt.Sprintf("none")))
 		} else {
-			w.Write([]byte(fmt.Sprintf("%.2f\n", result)))
+			w.Write([]byte(fmt.Sprintf("%q\n", result)))
 		}
 	}
 }

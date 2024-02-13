@@ -377,7 +377,7 @@ type Metric struct {
 }
 
 func (m Metric) String() string {
-	return fmt.Sprintf("key: %s, raw: %s, ts: %s", m.Key, m.RawValue, m.Timestamp)
+	return fmt.Sprintf("key: %s, raw: %d, val: %.2f, ts: %s", m.Key, m.RawValue, m.Value, m.Timestamp.Format("2006-01-02 15:04:05.000"))
 }
 
 // endregion
