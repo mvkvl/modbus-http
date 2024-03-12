@@ -7,7 +7,7 @@ Type=simple
 Restart=on-failure
 RestartSec=5
 User=root
-ExecStart=/usr/local/bin/mbridge -c /etc/mbridge/channels.json -l /etc/mbridge/logger.json -p 8088
+ExecStart=/usr/local/bin/mbridge -c /etc/mbridge/mbridge.properties
 
 [Install]
 WantedBy=multi-user.target

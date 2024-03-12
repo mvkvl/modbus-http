@@ -1,13 +1,13 @@
 {
-  "ttl": 30,
+  "ttl": "30s",
   "export_prometheus": true,
   "channels": [
     {
       "mode": "enc",
       "title": "wb-mge-01",
       "connection": "mge:20108",
-      "cycle_pause": 500,
-      "register_pause": 10,
+      "cycle_pause": "1500ms",
+      "register_pause": "10ms",
       "devices": [
         {
           "title": "vent",

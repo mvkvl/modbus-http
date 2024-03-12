@@ -1,87 +1,97 @@
 package main
 
 import (
+	_ "embed"
 	"encoding/json"
 	"flag"
 	"fmt"
 	"github.com/gorilla/mux"
-	log "github.com/jeanphorn/log4go"
-	"github.com/mvkvl/modbus"
-	"github.com/mvkvl/modbus-http/controller"
-	"github.com/mvkvl/modbus-http/model"
-	"github.com/mvkvl/modbus-http/service"
+	"github.com/joho/godotenv"
+	"mbridge/bridge"
+	"mbridge/controller"
+	"mbridge/model"
+	"mbridge/util"
+	"mbridge/util/env"
 	"net/http"
 	"os"
-	"time"
+	"syscall"
 )
 
+var defaultConfigFile = "/etc/mbridge/mbridge.properties"
+var defaultChannelsFile = "/etc/mbridge/channels.json"
+
+//go:embed logo.txt
+var logo string
+
 func main() {
-	//testApp()
-	runApp()
-}
 
-func testApp() {
-	config, err := readConfig("../conf/channels.json")
-	if nil != err {
-		fmt.Printf("Error: could not read config file: %s\n", err)
-		return
-	}
-	printConfig(config)
-}
-func runApp() {
-	channelConfigFilePtr := flag.String("c", "", "channel configuration file")
-	loggingConfigFilePtr := flag.String("l", "", "logging configuration file")
-	portPtr := flag.Int("p", 8080, "http port to bind to")
-	debugFlag := flag.Bool("d", false, "debug output")
+	defer func() {
+		if r := recover(); r != nil {
+			fmt.Println("application error: ", r)
+		}
+	}()
 
+	printLogo()
+	configFilePtr := flag.String("c", "", "configuration file")
 	flag.Parse()
 
-	if nil == channelConfigFilePtr || "" == *channelConfigFilePtr {
-		fmt.Println("Error: no channel configuration file passed")
-		return
+	if configFilePtr == nil {
+		configFilePtr = &defaultConfigFile
 	}
 
-	if nil != loggingConfigFilePtr && "" != *loggingConfigFilePtr {
-		log.LoadConfiguration(*loggingConfigFilePtr)
-	} else {
-		log.Close()
-	}
-	defer log.Close()
+	loadEnv(*configFilePtr)
 
-	config, err := readConfig(*channelConfigFilePtr)
-	if nil != err {
-		fmt.Printf("Error: could not read config file: %s\n", err)
-		return
-	}
+	var config *model.Config
 
-	if *debugFlag {
-		printConfig(config)
-	}
-	startServer(config, *portPtr)
+	config = readConfig(env.StringOrDefault("CHANNELS_CONFIG", defaultChannelsFile))
+	printConfig(config)
+
+	bridge := bridge.CreateBridge(config)
+	defer bridge.Stop()
+	bridge.Start()
+
+	go startServer(config, bridge, env.IntOrDefault("SERVICE_PORT", 8080))
+
+	util.GetLogger("main").Info("waiting for break signal...")
+	util.HandleSignals(syscall.SIGINT, syscall.SIGTERM)
+	util.GetLogger("main").Info("stop program")
 }
-func readConfig(path string) (*model.Config, error) {
+func printLogo() {
+	fmt.Println("")
+	fmt.Println(logo)
+	fmt.Println("")
+}
+func loadEnv(configFile string) {
+	err := godotenv.Load(configFile)
+	if err != nil {
+		os.Setenv("GO_ENV", "dev")
+		util.GetLogger("main").Debug("could not read configuration file")
+	}
+}
+func readConfig(path string) *model.Config {
 	content, err := os.ReadFile(path)
 	if err != nil {
-		return nil, err
+		panic(err)
 	}
 	var config model.Config
 	if err := json.Unmarshal(content, &config); err != nil {
-		return nil, err
+		panic(err)
 	}
-	// add back-reference from register to device
+	// add back-reference from register to device to channel
 	for i := 0; i < len(config.Channels); i++ {
 		c := config.Channels[i]
 		for j := 0; j < len(c.Devices); j++ {
 			d := c.Devices[j]
+			d.Channel = &c
 			for k := 0; k < len(d.Registers); k++ {
 				d.Registers[k].Device = &d
 			}
 		}
 	}
-	return &config, nil
+	return &config
 }
 func printConfig(config *model.Config) {
-	fmt.Printf("ttl: %d seconds,\nprometheus enabled: %t\nchannels:\n", config.Ttl, config.PrometheusExport)
+	fmt.Printf("ttl: %s,\nprometheus enabled: %t\nchannels:\n", *config.Ttl, config.PrometheusExport)
 	for _, c := range config.Channels {
 		fmt.Printf("\ttitle: %s, conn: %s, mode: %s, cpause: %d, rpause: %d\n",
 			c.Title, c.Connection, c.Mode, c.GetCyclePause(), c.GetRegisterPause())
@@ -94,47 +104,25 @@ func printConfig(config *model.Config) {
 			}
 		}
 	}
+	fmt.Println()
 }
-func startServer(config *model.Config, port int) {
+func startServer(config *model.Config, bridge bridge.Bridge, port int) {
 
-	poller := service.CreateModbusPoller(modbusHandlerFactory, config)
-	poller.Start()
-
-	cachedModbusService := controller.NewCachedModbusClient(poller)
+	controller := controller.NewBridgeController(bridge)
 
 	r := mux.NewRouter()
-	r.HandleFunc("/status", cachedModbusService.Status).Methods("GET")
-	r.HandleFunc("/start", cachedModbusService.Start).Methods("POST")
-	r.HandleFunc("/stop", cachedModbusService.Stop).Methods("POST")
-	r.HandleFunc("/cycle", cachedModbusService.Cycle).Methods("POST")
-	r.HandleFunc("/metrics", cachedModbusService.Metrics).Methods("GET")
-	r.HandleFunc("/metric/{metric}", cachedModbusService.Get).Methods("GET")
-	r.HandleFunc("/metric/{metric}", cachedModbusService.Write).Methods("POST")
+	r.HandleFunc("/start", controller.Start).Methods("POST")
+	r.HandleFunc("/stop", controller.Stop).Methods("POST")
+	r.HandleFunc("/registers", controller.Registers).Methods("GET")
+	r.HandleFunc("/metrics", controller.Metrics).Methods("GET")
+	r.HandleFunc("/flush", controller.Flush).Methods("POST")
+	r.HandleFunc("/metric/{metric}", controller.Get).Methods("GET")
+	r.HandleFunc("/metric/{metric}", controller.Write).Methods("POST")
 
 	if config.PrometheusExport {
-		r.HandleFunc("/metrics/prometheus", cachedModbusService.PrometheusMetrics).Methods("GET")
+		r.HandleFunc("/metrics/prometheus", controller.PrometheusMetrics).Methods("GET")
 	}
 
 	// Bind to a port and pass our router in
-	log.Warn(http.ListenAndServe(fmt.Sprintf(":%d", port), r))
-}
-
-func modbusHandlerFactory(connection string, mode model.Mode) modbus.ClientHandler {
-	switch mode {
-	case model.ENC:
-		_handler := modbus.NewEncClientHandler(connection)
-		_handler.IdleTimeout = 2 * time.Second
-		_handler.Timeout = 1 * time.Second
-		//_handler.Logger = log.New(os.Stdout, fmt.Sprintf("[%s]: ", connection), log.LstdFlags|log.Lmicroseconds)
-		return _handler
-	case model.TCP:
-		_handler := modbus.NewTCPClientHandler(connection)
-		//_handler.Logger = log.New(os.Stdout, fmt.Sprintf("[%s]: ", connection), log.LstdFlags|log.Lmicroseconds)
-		return _handler
-	case model.RTU:
-		_handler := modbus.NewRTUClientHandler(connection)
-		//_handler.Logger = log.New(os.Stdout, fmt.Sprintf("[%s]: ", connection), log.LstdFlags|log.Lmicroseconds)
-		return _handler
-	}
-	return nil
+	util.GetLogger("main").Error("%v", http.ListenAndServe(fmt.Sprintf(":%d", port), r))
 }

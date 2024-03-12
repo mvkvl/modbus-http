@@ -1,0 +1,25 @@
+@startuml
+
+skinparam componentStyle rectangle
+left to right direction
+
+component Executor as EX
+component Demultiplexer as SC
+component Poller as PL
+component "Command\nHandler" as CH
+
+component "Metric\nCache" as MC
+
+queue "Read\nCommands\nQueue" as RCQ
+queue "Write\nCommands\nQueue" as WCQ
+queue "Modbus\nCommands\nQueue" as MCQ
+
+PL --> RCQ
+CH --> WCQ
+RCQ --> SC
+WCQ --> SC
+SC --> MCQ
+MCQ --> EX
+EX -> MC
+
+@enduml

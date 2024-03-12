@@ -1,6 +1,7 @@
 .idea/
 conf/
-src/go.mod
 src/go.sum
 modbus-http
 package/distr/**
+distr
+src/logo.txt

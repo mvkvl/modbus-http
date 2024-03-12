@@ -1,0 +1,35 @@
+@startuml
+
+
+rectangle Bridge {
+'    processors[s]p
+}
+rectangle "ChannelProcessor" as CP {
+'    Commander
+'    Poller
+'    Demultiplexer
+'    Executor
+}
+rectangle "Commander" as C {
+}
+rectangle "Poller" as P {
+}
+rectangle Demultiplexer as D {
+}
+rectangle Executor as EX {
+}
+rectangle ModbusClient as MB {
+}
+rectangle MetricCache as CACHE {
+}
+
+Bridge --> CP
+CP 0--> C
+CP --> P
+CP --> D
+CP --> EX
+EX --> MB
+EX --> CACHE
+CP 0--> CACHE
+
+@enduml
